@@ -1,4 +1,4 @@
-# 🏋️‍♂️ Agymos
+# 🏋️‍♂️ Gy
 
 O **Gy** é um aplicativo web mobile-first voltado à organização de treinos e ao acompanhamento da evolução física. Com uma interface moderna, leve e intuitiva, o Gy permite criar e personalizar fichas de treino, registrar séries, repetições e cargas, monitorar medidas corporais e visualizar o progresso por meio de gráficos e indicadores.
 
