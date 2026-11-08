@@ -40,10 +40,10 @@ Funciona como um **Progressive Web App (PWA)** com persistência 100% client-sid
 
 ```bash
 # Clone o repositório
-git clone [https://github.com/SEU_USUARIO/gy.git](https://github.com/edinaldoGit/gy.git)
+git clone https://github.com/edinaldoGit/gy.git
 
 # Acesse a pasta do projeto
-cd gymmi
+cd gy
 
 # Instale as dependências
 npm install

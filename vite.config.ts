@@ -12,23 +12,26 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Gy - Workout Tracker',
+        name: 'Gy',
         short_name: 'Gy',
         description: 'Organização de treinos e acompanhamento de evolução física.',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        lang: 'pt-BR',
+        theme_color: '#FC6471',
+        background_color: '#F1EDEE',
         display: 'standalone',
         orientation: 'portrait',
         icons: [
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'pwa-512x512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           }
         ]
       }

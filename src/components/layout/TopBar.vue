@@ -2,16 +2,20 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { db } from '@/database/db'
+import { storeToRefs } from 'pinia'
+import { useTreinoStore } from '@/stores/treinoStore'
 import { Dumbbell, ClipboardList, History, User, ChevronDown, UserRound, Flame } from 'lucide-vue-next'
 
 const route = useRoute()
 const isMenuExpanded = ref(false)
 const fotoUsuario = ref<string | null>(null)
 
-// --- Estados Simulados (Mockados) ---
-const streakDays = ref(3) // Quantidade de dias seguidos
-const isWorkoutActive = ref(true) // Se existe um treino rolando agora
-const workoutDuration = ref('45:12') // Tempo de treino
+// --- Integração Real com o Treino ---
+const treinoStore = useTreinoStore()
+const { estadoAtual, cronometroFormatado } = storeToRefs(treinoStore)
+
+const isWorkoutActive = computed(() => estadoAtual.value === 'execucao')
+const streakDays = ref(3) // Pode conectar com o banco depois
 // ------------------------------------
 
 const navItems = [
@@ -25,7 +29,6 @@ const currentTab = computed(() => {
   return navItems.find(item => item.path === route.path) || navItems[0]
 })
 
-// Fundo principal da barra
 const headerBgClass = computed(() => {
   const colorMap: Record<string, string> = {
     'amethyst': 'bg-amethyst-500',
@@ -36,7 +39,6 @@ const headerBgClass = computed(() => {
   return colorMap[currentTab.value.color]
 })
 
-// Estilos dinâmicos do Círculo e da Pílula na direita
 const activeTabStyles = computed(() => {
   const styles: Record<string, any> = {
     'amethyst': { icon: 'text-amethyst-500', pillBg: 'bg-amethyst-50', pillText: 'text-amethyst-600' },
@@ -61,24 +63,21 @@ onMounted(async () => {
 
 <template>
   <div class="relative">
+    <!-- TOPBAR FIXA z-[100] (Protegida do blur de baixo) -->
     <header 
-      class="w-full flex flex-col shadow-xl transition-colors duration-500 ease-in-out z-40 rounded-b-[2.5rem] relative"
+      class="w-full flex flex-col shadow-xl transition-colors duration-500 ease-in-out z-[100] rounded-b-[2.5rem] relative"
       :class="headerBgClass"
     >
-      <!-- Barra Superior Fixa -->
       <div class="flex items-center justify-between px-6 h-32 pt-6 pb-2">
         
-        <!-- Esquerda: Foto de Perfil + Pílula de Ofensiva -->
+        <!-- Esquerda: Perfil + Ofensiva -->
         <div class="flex items-center flex-1 justify-start">
-          
-          <!-- Círculo da Foto (z-10 para ficar por cima) -->
           <div class="w-14 h-14 rounded-full bg-whitesmoke-50/20 flex items-center justify-center overflow-hidden border-[2px] border-whitesmoke-50 shadow-sm relative z-10 shrink-0 transition-all duration-300"
                :class="{'ring-4 ring-whitesmoke-50/30': isWorkoutActive}">
             <img v-if="fotoUsuario" :src="fotoUsuario" class="w-full h-full object-cover" />
             <UserRound v-else :size="28" class="text-whitesmoke-50" />
           </div>
           
-          <!-- Pílula do Foguinho (Fundo totalmente branco e texto na cor da aba) -->
           <div v-if="streakDays > 0" class="h-9 flex items-center pl-6 pr-4 -ml-5 rounded-r-full bg-whitesmoke-50 relative z-0 shadow-sm">
             <div class="flex items-center gap-1.5 translate-x-0.5">
               <Flame :size="18" class="text-orange-400 drop-shadow-sm" fill="currentColor" stroke-width="1.5" />
@@ -90,29 +89,40 @@ onMounted(async () => {
               </span>
             </div>
           </div>
-
         </div>
 
-        <!-- Centro: Indicador de Treino em Andamento -->
-        <div class="flex flex-col items-center justify-center shrink-0">
-          <Transition name="fade" appear>
-            <div v-if="isWorkoutActive" class="flex flex-col items-center">
+        <!-- Centro: Logo Mutante (Logo Branca -> Cronômetro) -->
+        <div class="flex flex-col items-center justify-center shrink-0 w-24 h-12 relative">
+          <Transition name="fade-scale" mode="out-in">
+            
+            <!-- Estado 1: Treino ROLANDO (Cronômetro Pulsante) -->
+            <div v-if="isWorkoutActive" class="flex flex-col items-center absolute inset-0 justify-center">
               <div class="flex items-center gap-1.5 bg-whitesmoke-950/15 px-3 py-1.5 rounded-full backdrop-blur-sm border border-whitesmoke-50/20 shadow-inner">
                 <div class="w-2 h-2 rounded-full bg-bubblegum-400 animate-pulse shadow-[0_0_5px_rgba(252,100,113,0.8)]"></div>
                 <span class="text-[11px] font-bold text-whitesmoke-50 tracking-widest font-mono translate-y-[0.5px]">
-                  {{ workoutDuration }}
+                  {{ cronometroFormatado }}
                 </span>
               </div>
               <span class="text-[7px] font-bold text-whitesmoke-50/80 uppercase tracking-[0.2em] mt-1.5 drop-shadow-sm">
                 Em Andamento
               </span>
             </div>
+
+            <!-- Estado 2: Repouso / Finalizado (Logo Pintada de Branco) -->
+            <div v-else class="flex flex-col items-center justify-center absolute inset-0">
+              <!-- O brightness-0 invert transforma a logo original na cor branca pura! -->
+              <img 
+                src="@/assets/logo.png" 
+                alt="Gy Logo" 
+                class="h-14 object-contain brightness-0 invert drop-shadow-sm"
+              />
+            </div>
+
           </Transition>
         </div>
 
-        <!-- Direita: Círculo Branco + Pílula Animada -->
+        <!-- Direita: Pílula da Aba -->
         <div class="flex items-center flex-1 justify-end">
-          
           <Transition name="pill" appear mode="out-in">
             <div 
               :key="currentTab.path"
@@ -138,18 +148,16 @@ onMounted(async () => {
               />
             </Transition>
           </div>
-
         </div>
 
       </div>
 
-      <!-- Área Expansível: Opções lado a lado -->
+      <!-- Menu Expansível -->
       <div 
         class="overflow-hidden transition-all duration-500 ease-in-out flex flex-col justify-center"
         :class="isMenuExpanded ? 'max-h-32 opacity-100 mb-8' : 'max-h-0 opacity-0'"
       >
         <div class="flex flex-row items-center justify-center gap-2 px-4 py-2">
-          
           <router-link
             v-for="item in navItems"
             :key="item.path"
@@ -171,11 +179,9 @@ onMounted(async () => {
               {{ item.name }}
             </span>
           </router-link>
-
         </div>
       </div>
 
-      <!-- Orelha de Expansão -->
       <div 
         @click="toggleMenu"
         class="absolute -bottom-5 left-1/2 -translate-x-1/2 w-16 h-7 flex items-center justify-center rounded-b-2xl cursor-pointer transition-colors duration-500 ease-in-out shadow-lg border-t border-whitesmoke-50/10"
@@ -192,51 +198,20 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Animação da Pílula Direita (Aba) */
-.pill-enter-active {
-  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  max-width: 150px;
-}
+.pill-enter-active { transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); max-width: 150px; }
+.pill-leave-active { transition: all 0.25s ease-out; max-width: 150px; }
+.pill-enter-from, .pill-leave-to { max-width: 0; opacity: 0; padding-left: 0; }
 
-.pill-leave-active {
-  transition: all 0.25s ease-out;
-  max-width: 150px;
-}
+.icon-pop-enter-active { transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.icon-pop-leave-active { transition: all 0.2s ease-out; }
+.icon-pop-enter-from { opacity: 0; transform: scale(0.3) rotate(-30deg); }
+.icon-pop-leave-to { opacity: 0; transform: scale(0.3) rotate(30deg); }
 
-.pill-enter-from,
-.pill-leave-to {
-  max-width: 0;
-  opacity: 0;
-  padding-left: 0;
+/* Transição muito suave entre a Logo e o Relógio */
+.fade-scale-enter-active,
+.fade-scale-leave-active {
+  transition: all 0.4s ease;
 }
-
-/* Animação do Ícone no Círculo Branco */
-.icon-pop-enter-active {
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.icon-pop-leave-active {
-  transition: all 0.2s ease-out;
-}
-
-.icon-pop-enter-from {
-  opacity: 0;
-  transform: scale(0.3) rotate(-30deg);
-}
-
-.icon-pop-leave-to {
-  opacity: 0;
-  transform: scale(0.3) rotate(30deg);
-}
-
-/* Animação do timer central */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+.fade-scale-enter-from { opacity: 0; transform: scale(0.9); }
+.fade-scale-leave-to { opacity: 0; transform: scale(1.1); }
 </style>
