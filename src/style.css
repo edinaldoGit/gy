@@ -2,10 +2,8 @@
 
 @theme {
 
-  /* Fonte padrão do sistema */
   --font-sans: "Fredoka", sans-serif;
 
-  /* Bubblegum Pink */
   --color-bubblegum-50: #fee6e8;
 
   /* Bubblegum Pink (Ações destrutivas, alertas ou botões de destaque) */
@@ -74,9 +72,52 @@
   --color-cerulean-950: #07161d;
 }
 
-/* Configuração global do corpo do aplicativo (Tema Claro) */
 @layer base {
   body {
     @apply bg-whitesmoke-50 text-whitesmoke-950 antialiased;
   }
+
+  *, *::before, *::after {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  *::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
+@utility gy-scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
+
+.gy-modal-enter-active, .gy-modal-leave-active {
+  transition: opacity 280ms ease;
+}
+.gy-modal-enter-from, .gy-modal-leave-to { opacity: 0; }
+.gy-modal-enter-active .gy-modal-panel, .gy-sheet-enter-active {
+  transition: transform 420ms cubic-bezier(.22, 1, .36, 1);
+  will-change: transform;
+}
+.gy-modal-leave-active .gy-modal-panel, .gy-sheet-leave-active {
+  transition: transform 280ms cubic-bezier(.4, 0, 1, 1);
+  will-change: transform;
+  pointer-events: none;
+}
+.gy-modal-enter-from .gy-modal-panel, .gy-modal-leave-to .gy-modal-panel,
+.gy-sheet-enter-from, .gy-sheet-leave-to { transform: translateY(100%); }
+@media (prefers-reduced-motion: reduce) {
+  .gy-modal-enter-active, .gy-modal-leave-active,
+  .gy-modal-enter-active .gy-modal-panel, .gy-modal-leave-active .gy-modal-panel,
+  .gy-sheet-enter-active, .gy-sheet-leave-active { transition: none; }
 }

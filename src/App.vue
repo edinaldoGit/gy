@@ -1,22 +1,41 @@
 <script setup lang="ts">
+import { onMounted, onBeforeUnmount, watch } from 'vue'
+import ConfirmDialog from '@/components/feedback/ConfirmDialog.vue'
+import { confirmation } from '@/composables/useConfirm'
+import { feedback } from '@/composables/useFeedback'
 import { useRoute } from 'vue-router'
 import TopBar from '@/components/layout/TopBar.vue'
 
 const route = useRoute()
+const { state } = confirmation
+let interval: ReturnType<typeof setInterval> | undefined
+const visibility = () => feedback.pause('hidden', document.hidden)
+watch(() => route.path === '/onboarding', hidden => feedback.pause('no-surface', hidden), { immediate: true })
+watch(() => !!state.value.options, open => feedback.pause('confirmation', open), { flush: 'sync' })
+onMounted(() => {
+  visibility()
+  document.addEventListener('visibilitychange', visibility)
+  interval = setInterval(feedback.tick, 50)
+})
+onBeforeUnmount(() => { clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
 </script>
 
 <template>
-  <div class="flex flex-col h-screen bg-whitesmoke-50 overflow-hidden">
+  <div class="flex h-dvh flex-col overflow-hidden bg-whitesmoke-50">
     
-    <TopBar v-if="route.path !== '/onboarding'" />
+    <div v-if="route.path !== '/onboarding'" class="relative z-[100] shrink-0" :inert="!!state.options"><TopBar /></div>
 
-    <main class="flex-1 overflow-y-auto p-4 mt-4">
+    <div class="relative isolate z-0 min-h-0 flex-1">
+
+    <main tabindex="-1" :inert="!!state.options" class="h-full min-h-0 overflow-y-auto px-4 pb-4" :class="{ '!overflow-hidden': !!state.options }">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
         </transition>
       </router-view>
     </main>
+    <ConfirmDialog />
+    </div>
 
   </div>
 </template>

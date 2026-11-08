@@ -1,14 +1,28 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
 import { db } from '@/database/db'
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
 import { Dumbbell, ClipboardList, History, User, ChevronDown, UserRound, Flame } from 'lucide-vue-next'
 
+import type { FeedbackMessage } from '@/utils/feedbackManager'
+import { feedbackThemes } from '@/theme/feedbackThemes'
+import TopBarFeedback from '@/components/feedback/TopBarFeedback.vue'
+import { feedback } from '@/composables/useFeedback'
+import { confirmation } from '@/composables/useConfirm'
+
 const route = useRoute()
 const isMenuExpanded = ref(false)
 const fotoUsuario = ref<string | null>(null)
+const displayedFeedback = shallowRef<FeedbackMessage | null>(null)
+watch(feedback.current, message => { if (message) displayedFeedback.value = message }, { immediate: true })
+const feedbackVisible = computed(() => !!feedback.current.value && !confirmation.state.value.options)
+const feedbackBg = computed(() => {
+  const kind = feedback.current.value?.kind
+  return kind ? feedbackThemes[kind].background : ''
+})
+watch([feedbackVisible, () => !!confirmation.state.value.options], ([visible, modal]) => { if (visible || modal) isMenuExpanded.value = false })
 
 // --- Integração Real com o Treino ---
 const treinoStore = useTreinoStore()
@@ -66,9 +80,10 @@ onMounted(async () => {
     <!-- TOPBAR FIXA z-[100] (Protegida do blur de baixo) -->
     <header 
       class="w-full flex flex-col shadow-xl transition-colors duration-500 ease-in-out z-[100] rounded-b-[2.5rem] relative"
-      :class="headerBgClass"
+      :class="feedbackVisible ? feedbackBg : headerBgClass"
     >
-      <div class="flex items-center justify-between px-6 h-32 pt-6 pb-2">
+      <div class="topbar-stage grid h-32 items-center overflow-hidden">
+      <div class="topbar-normal flex h-32 min-w-0 items-center justify-between px-6 pt-6 pb-2" :class="{ 'topbar-normal-hidden': feedbackVisible }" :inert="feedbackVisible" :aria-hidden="feedbackVisible">
         
         <!-- Esquerda: Perfil + Ofensiva -->
         <div class="flex items-center flex-1 justify-start">
@@ -114,7 +129,7 @@ onMounted(async () => {
               <img 
                 src="@/assets/logo.png" 
                 alt="Gy Logo" 
-                class="h-14 object-contain brightness-0 invert drop-shadow-sm"
+                class="h-16 object-contain brightness-0 invert drop-shadow-sm"
               />
             </div>
 
@@ -152,8 +167,14 @@ onMounted(async () => {
 
       </div>
 
+      <Transition name="feedback">
+        <TopBarFeedback v-if="feedbackVisible && displayedFeedback" :notification="displayedFeedback" class="topbar-message" />
+      </Transition>
+      </div>
+
       <!-- Menu Expansível -->
       <div 
+        :inert="feedbackVisible || !isMenuExpanded"
         class="overflow-hidden transition-all duration-500 ease-in-out flex flex-col justify-center"
         :class="isMenuExpanded ? 'max-h-32 opacity-100 mb-8' : 'max-h-0 opacity-0'"
       >
@@ -183,9 +204,18 @@ onMounted(async () => {
       </div>
 
       <div 
+        role="button"
+        tabindex="0"
+        aria-label="Abrir ou fechar navegação"
+        :aria-expanded="isMenuExpanded"
+        @keydown.enter.prevent="toggleMenu"
+        @keydown.space.prevent="toggleMenu"
         @click="toggleMenu"
+        :inert="feedbackVisible"
+        :aria-hidden="feedbackVisible"
+        :style="feedbackVisible ? { opacity: 0, pointerEvents: 'none' } : undefined"
         class="absolute -bottom-5 left-1/2 -translate-x-1/2 w-16 h-7 flex items-center justify-center rounded-b-2xl cursor-pointer transition-colors duration-500 ease-in-out shadow-lg border-t border-whitesmoke-50/10"
-        :class="headerBgClass"
+        :class="feedbackVisible ? feedbackBg : headerBgClass"
       >
         <ChevronDown 
           :size="22" 
@@ -198,6 +228,19 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.topbar-normal, .topbar-message { grid-area: 1 / 1; }
+.topbar-normal { opacity: 1; transition: opacity .22s ease .12s; }
+.topbar-normal > div { transition: transform .32s cubic-bezier(.22,1,.36,1) .08s; }
+.topbar-normal-hidden { opacity: 0; pointer-events: none; transition-delay: 0s; }
+.topbar-normal-hidden > div:first-child { transform: translateX(24px) scale(.88); }
+.topbar-normal-hidden > div:nth-child(2) { transform: translateY(-18px) scale(.8); }
+.topbar-normal-hidden > div:last-child { transform: translateX(-24px) scale(.88); }
+.feedback-enter-active { transition: opacity .28s ease .18s, transform .36s cubic-bezier(.22,1,.36,1) .18s; }
+.feedback-leave-active { transition: opacity .18s ease, transform .2s ease; pointer-events: none; }
+.feedback-enter-from { opacity: 0; transform: translateY(16px) scale(.96); }
+.feedback-leave-to { opacity: 0; transform: translateY(-12px) scale(.96); }
+@media(prefers-reduced-motion:reduce) { *, :deep(*) { transition: none !important; animation: none !important; } }
+
 .pill-enter-active { transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); max-width: 150px; }
 .pill-leave-active { transition: all 0.25s ease-out; max-width: 150px; }
 .pill-enter-from, .pill-leave-to { max-width: 0; opacity: 0; padding-left: 0; }

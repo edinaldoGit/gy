@@ -2,10 +2,10 @@
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
 import { Trophy, Clock, Dumbbell, CheckCircle2 } from 'lucide-vue-next'
+import PagePillHeader from '@/components/layout/PagePillHeader.vue'
 
 const store = useTreinoStore()
 const { treinoHoje, cronometroFormatado } = storeToRefs(store)
-const { getCorObj } = store // Trazendo a função de cores da store
 
 const voltarParaInicio = () => {
   store.estadoAtual = 'preview'
@@ -13,9 +13,9 @@ const voltarParaInicio = () => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full px-2 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-10">
+  <div class="flex flex-col animate-in fade-in slide-in-from-bottom-8 duration-700 pb-10">
+    <PagePillHeader titulo="Resumo do treino" subtitulo="Sessão concluída" tema="treino" mostrar-voltar @voltar="voltarParaInicio" />
     
-    <!-- HEADER TRIUNFAL -->
     <div class="flex flex-col items-center justify-center pt-8 pb-6">
       <div class="w-24 h-24 bg-emerald-50 rounded-[2rem] flex items-center justify-center border border-emerald-100 mb-6 relative">
         <Trophy :size="40" class="text-emerald-500" stroke-width="1.5" />
@@ -27,7 +27,6 @@ const voltarParaInicio = () => {
       <p class="text-whitesmoke-500 text-center mt-3 font-medium text-sm px-4">O suor de hoje é o resultado de amanhã. Excelente trabalho no <strong class="text-whitesmoke-950">{{ treinoHoje?.nome }}</strong>.</p>
     </div>
 
-    <!-- CARDS DE ESTATÍSTICAS -->
     <div class="grid grid-cols-2 gap-4 mb-8">
       <div class="bg-white p-4 rounded-3xl border border-whitesmoke-200 flex flex-col items-center justify-center text-center">
         <Clock :size="20" class="text-amethyst-500 mb-2" />
@@ -41,13 +40,5 @@ const voltarParaInicio = () => {
       </div>
     </div>
 
-    <!-- BOTÃO FINAL (Agora com a cor dinâmica do treino) -->
-    <button 
-      @click="voltarParaInicio"
-      class="w-full text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center mt-auto transition-all active:scale-[0.98]"
-      :class="getCorObj(treinoHoje?.corTema || 'cerulean').bg"
-    >
-      VOLTAR AO INÍCIO
-    </button>
   </div>
 </template>

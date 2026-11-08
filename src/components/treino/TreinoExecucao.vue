@@ -1,13 +1,16 @@
 <script setup lang="ts">
+import ModalSheetHeader from '@/components/layout/ModalSheetHeader.vue'
+import { modalSheetBackdrop, modalSheetPanel } from '@/components/layout/modalSheetStyles'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
-import { CheckCircle2, ChevronDown, CheckCheck, RotateCcw, Check, Play, X, WifiOff, Timer } from 'lucide-vue-next'
+import { CheckCircle2, ChevronDown, CheckCheck, RotateCcw, Check, Play, WifiOff, Timer } from 'lucide-vue-next'
 
 const store = useTreinoStore()
-const { 
-  treinoHoje, exerciciosExecucao, exercicioExpandido, 
-  progressoTreino, modalVideoAberto, videoUrlAtivo, videoTituloAtivo 
+const {
+  treinoHoje, exerciciosExecucao, exercicioExpandido,
+  progressoTreino, modalVideoAberto, videoUrlAtivo, videoTituloAtivo,
+  estadoPersistencia, erroPersistencia
 } = storeToRefs(store)
 
 const temConexao = ref(navigator.onLine)
@@ -25,33 +28,40 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <!-- Relative para conter as camadas internas corretamente -->
   <div class="flex flex-col gap-4 animate-in slide-in-from-right-4 pb-20 relative">
-    
-    <!-- TOPBAR INTACTA (Sem cronômetro, z-100 e fundo sólido para bloquear o blur) -->
-    <div class="flex flex-col gap-2 px-2 mb-2 sticky top-0 z-[100] bg-whitesmoke-50 py-4 -mx-2 px-4 rounded-b-2xl shadow-sm border-b border-whitesmoke-200/80">
-      <h2 class="text-xl font-black text-whitesmoke-950 leading-none">{{ treinoHoje?.nome }}</h2>
+
+    <div class="mb-2 flex flex-col gap-3 px-2 pt-8 pb-3">
+      <p class="break-words text-xl font-black text-amethyst-500">{{ treinoHoje?.nome || 'Treino em andamento' }}</p>
       <div class="flex items-center gap-3">
         <div class="flex-1 h-1.5 bg-whitesmoke-200 rounded-full overflow-hidden">
-          <div class="h-full transition-all duration-500" :class="`bg-${treinoHoje?.corTema}-500`" :style="{ width: progressoTreino.porcentagem + '%' }"></div>
+          <div class="h-full bg-amethyst-500 transition-all duration-500" :style="{ width: progressoTreino.porcentagem + '%' }"></div>
         </div>
         <span class="text-[10px] font-bold text-whitesmoke-500 shrink-0">{{ progressoTreino.concluidos }}/{{ progressoTreino.total }} concluídos</span>
       </div>
+      <div v-if="estadoPersistencia === 'erro'" role="alert" class="flex items-center justify-between gap-3 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+        <span>{{ erroPersistencia }}</span>
+        <button type="button" @click="store.tentarSalvarNovamente" class="shrink-0 rounded-lg bg-white px-3 py-2 font-bold text-red-700 shadow-sm">
+          Tentar novamente
+        </button>
+      </div>
+      <p v-else aria-live="polite" class="text-[10px] font-medium text-whitesmoke-400">
+        {{ estadoPersistencia === 'salvando' ? 'Salvando alterações…' : 'Sessão salva automaticamente' }}
+      </p>
     </div>
 
-    <!-- LISTA DE EXERCÍCIOS (Camada inferior z-10 que será borrada) -->
+    <!-- Camada sob o painel de foco; o z-10 mantém o desfoque abaixo dele. -->
     <div class="flex flex-col gap-3 relative z-10">
-      <div 
+      <div
         v-for="(ex, index) in exerciciosExecucao" :key="ex.idUnico"
         class="bg-white rounded-[1.5rem] shadow-sm border transition-all duration-500 overflow-hidden"
         :class="[
-          exercicioExpandido === ex.idUnico ? `border-${treinoHoje?.corTema}-400 shadow-md ring-4 ring-${treinoHoje?.corTema}-50` : 'border-whitesmoke-200',
+          exercicioExpandido === ex.idUnico ? 'border-amethyst-200 shadow-sm' : 'border-whitesmoke-200',
           ex.concluido && exercicioExpandido !== ex.idUnico ? 'opacity-60 bg-whitesmoke-50' : ''
         ]"
       >
         <div @click="exercicioExpandido = exercicioExpandido === ex.idUnico ? null : ex.idUnico" class="flex items-center gap-4 p-4 cursor-pointer select-none">
           <div class="w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors"
-            :class="[ex.concluido ? 'bg-teal-500 text-white' : exercicioExpandido === ex.idUnico ? `bg-${treinoHoje?.corTema}-500 text-white` : `bg-${treinoHoje?.corTema}-50 text-${treinoHoje?.corTema}-500`]">
+            :class="[ex.concluido ? 'bg-teal-500 text-white' : exercicioExpandido === ex.idUnico ? 'bg-amethyst-100 text-amethyst-600' : 'bg-amethyst-50 text-amethyst-500']">
             <CheckCircle2 v-if="ex.concluido" :size="24" />
             <span v-else class="font-black text-lg">{{ index + 1 }}</span>
           </div>
@@ -65,7 +75,7 @@ onUnmounted(() => {
         <div class="grid transition-all duration-500 ease-in-out" :class="exercicioExpandido === ex.idUnico ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
           <div class="overflow-hidden">
             <div class="p-4 pt-0 border-t border-whitesmoke-100 mt-2 flex flex-col gap-4">
-              
+
               <div @click.stop="store.abrirVideo(ex.nome, ex.videoUrl)" class="mt-3 relative w-full h-20 rounded-2xl overflow-hidden bg-whitesmoke-100 border border-whitesmoke-200 cursor-pointer group shadow-sm flex items-center justify-between px-4 hover:border-whitesmoke-300 transition-colors">
                 <div class="flex items-center gap-3">
                   <div class="w-10 h-10 rounded-xl bg-white shadow-sm border border-whitesmoke-200 flex items-center justify-center text-whitesmoke-700 group-hover:scale-105 transition-transform">
@@ -80,10 +90,7 @@ onUnmounted(() => {
               </div>
 
               <div>
-                <div class="flex items-center justify-between mb-2">
-                  <div class="flex items-center px-2 text-[10px] font-bold text-whitesmoke-400 uppercase tracking-widest gap-4">
-                    <span class="w-8 text-center">Série</span><span class="w-14 text-center">Peso</span><span class="w-14 text-center">Reps</span>
-                  </div>
+                <div class="mb-3 flex justify-end">
                   <div class="flex items-center gap-1">
                     <button v-if="ex.concluido" @click="store.resetarExercicio(ex.idUnico)" class="text-[9px] font-bold text-red-400 bg-red-50 px-2 py-1 rounded-lg flex items-center gap-1 hover:bg-red-100">
                       <RotateCcw :size="10" /> DESFAZER
@@ -94,18 +101,25 @@ onUnmounted(() => {
                   </div>
                 </div>
 
+                <div class="mb-2 grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3rem] items-center gap-2 border border-transparent px-2 text-center text-[10px] font-bold uppercase tracking-widest text-whitesmoke-400">
+                  <span>Série</span>
+                  <span>Peso</span>
+                  <span>Reps</span>
+                  <span class="sr-only">Concluir série</span>
+                </div>
+
                 <div class="flex flex-col gap-2">
-                  <div v-for="(serie, sIndex) in ex.seriesRealizadas" :key="sIndex" class="flex items-center p-2 rounded-2xl transition-colors duration-300" :class="serie.finalizada ? 'bg-teal-50/50 border border-teal-100/50' : 'bg-white border border-whitesmoke-200'">
+                  <div v-for="(serie, sIndex) in ex.seriesRealizadas" :key="sIndex" class="grid grid-cols-[2rem_minmax(0,1fr)_minmax(0,1fr)_3rem] items-center gap-2 p-2 rounded-2xl transition-colors duration-300" :class="serie.finalizada ? 'bg-teal-50/50 border border-teal-100/50' : 'bg-white border border-whitesmoke-200'">
                     <div class="w-8 text-center font-black text-whitesmoke-400" :class="{'text-teal-600': serie.finalizada}">{{ serie.numero }}</div>
-                    
-                    <div class="flex-1 flex justify-center">
-                      <input type="number" v-model.number="serie.pesoFito" @input="store.atualizarPesoSequencial(ex.idUnico, sIndex)" :disabled="serie.finalizada" class="w-16 bg-whitesmoke-100 text-center font-semibold text-whitesmoke-950 py-2 rounded-xl border border-transparent outline-none disabled:opacity-50" />
+
+                    <div class="flex min-w-0 justify-center">
+                      <input type="number" :aria-label="`Peso da série ${serie.numero} de ${ex.nome}`" v-model.number="serie.pesoFito" @input="store.atualizarPesoSequencial(ex.idUnico, sIndex)" :disabled="serie.finalizada" class="w-full min-w-0 max-w-16 bg-whitesmoke-100 text-center font-semibold text-whitesmoke-950 py-2 rounded-xl border border-transparent outline-none disabled:opacity-50" />
                     </div>
-                    
-                    <div class="flex-1 flex justify-center">
-                      <input type="text" v-model="serie.repsFeitas" :disabled="serie.finalizada" class="w-16 bg-whitesmoke-100 text-center font-semibold text-whitesmoke-950 py-2 rounded-xl border border-transparent outline-none disabled:opacity-50" />
+
+                    <div class="flex min-w-0 justify-center">
+                      <input type="text" :aria-label="`Repetições da série ${serie.numero} de ${ex.nome}`" v-model="serie.repsFeitas" :disabled="serie.finalizada" class="w-full min-w-0 max-w-16 bg-whitesmoke-100 text-center font-semibold text-whitesmoke-950 py-2 rounded-xl border border-transparent outline-none disabled:opacity-50" />
                     </div>
-                    
+
                     <div class="w-12 flex justify-center">
                       <button @click="store.concluirSerie(ex.idUnico, sIndex)" class="w-10 h-10 rounded-xl flex items-center justify-center transition-all shadow-sm active:scale-95" :class="serie.finalizada ? 'bg-teal-500 text-white shadow-teal-500/30' : 'bg-whitesmoke-200 text-whitesmoke-400'">
                         <Check v-if="serie.finalizada" :size="20" stroke-width="3" />
@@ -122,21 +136,16 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- BOTÃO FINALIZAR -->
-    <button 
-      @click="store.finalizarTreino" 
-      :disabled="progressoTreino.concluidos < progressoTreino.total"
-      class="w-full text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] mt-4 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 relative z-10"
-      :class="`bg-${treinoHoje?.corTema}-500 hover:opacity-90`"
+    <button
+      :aria-busy="store.finalizando" @click="store.finalizarTreino"
+      :disabled="store.finalizando || progressoTreino.concluidos < progressoTreino.total"
+      class="relative z-10 mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-amethyst-500 py-4 text-sm font-black text-white transition-all hover:bg-amethyst-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 disabled:opacity-40"
     >
       {{ progressoTreino.concluidos < progressoTreino.total ? `CONCLUA TODOS OS EXERCÍCIOS (${progressoTreino.concluidos}/${progressoTreino.total})` : 'FINALIZAR TREINO HOJE' }}
     </button>
 
 
-    <!-- ========================================== -->
-    <!-- MODO FOCO: CRONÔMETRO CENTRALIZADO (z-40)  -->
-    <!-- BLUR REAL (O z-40 garante que passe apenas por baixo da topbar z-100) -->
-    <!-- ========================================== -->
+    <!-- z-40 mantém o painel e o desfoque abaixo da TopBar (z-100). -->
     <transition
       enter-active-class="transition-all duration-500 ease-out"
       enter-from-class="opacity-0"
@@ -146,30 +155,26 @@ onUnmounted(() => {
       leave-to-class="opacity-0"
     >
       <div v-if="store.descansoRodando || store.descansoZerado" class="fixed inset-0 z-40 flex flex-col items-center justify-center bg-white/40 backdrop-blur-xl px-6">
-        
-        <!-- Cartão Central Clean -->
-        <div 
+
+        <div
           class="bg-white w-full max-w-xs rounded-[2.5rem] p-8 flex flex-col items-center text-center transition-all duration-500 border animate-in zoom-in-95 duration-500"
           :class="store.descansoZerado ? 'shadow-emerald-500/20 border-emerald-100' : 'shadow-[0_20px_40px_rgba(0,0,0,0.08)] border-whitesmoke-100'"
         >
-          <!-- Ícone Gigante -->
           <div class="w-20 h-20 rounded-full flex items-center justify-center mb-6 transition-colors duration-500" :class="store.descansoZerado ? 'bg-emerald-50 text-emerald-500' : `bg-${treinoHoje?.corTema}-50 text-${treinoHoje?.corTema}-500`">
              <Timer v-if="store.descansoRodando" :size="40" class="animate-pulse" />
              <CheckCircle2 v-else :size="44" stroke-width="2.5" />
           </div>
 
-          <!-- Textos -->
           <span class="text-[10px] font-bold uppercase tracking-widest mb-1 transition-colors" :class="store.descansoZerado ? 'text-emerald-500' : 'text-whitesmoke-400'">
             {{ store.descansoRodando ? 'Recuperação' : 'Acabou o tempo!' }}
           </span>
-          
+
           <div class="text-7xl font-black font-mono tracking-tighter leading-none mb-8 transition-colors" :class="store.descansoZerado ? 'text-emerald-500' : 'text-whitesmoke-950'">
-            {{ store.descansoRodando 
-                ? Math.floor(store.descansoTempoRestante / 60).toString().padStart(2, '0') + ':' + (store.descansoTempoRestante % 60).toString().padStart(2, '0') 
+            {{ store.descansoRodando
+                ? Math.floor(store.descansoTempoRestante / 60).toString().padStart(2, '0') + ':' + (store.descansoTempoRestante % 60).toString().padStart(2, '0')
                 : '00:00' }}
           </div>
 
-          <!-- Botão de Ação -->
           <button @click="store.pularDescanso" class="w-full py-4 rounded-2xl font-black text-sm transition-all active:scale-95" :class="store.descansoZerado ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 'bg-whitesmoke-100 hover:bg-whitesmoke-200 text-whitesmoke-500'">
             {{ store.descansoZerado ? 'BORA VOLTAR!' : 'PULAR DESCANSO' }}
           </button>
@@ -179,21 +184,11 @@ onUnmounted(() => {
     </transition>
 
 
-    <!-- ========================================== -->
-    <!-- MODAL DO YOUTUBE (Acima de tudo z-60)      -->
-    <!-- ========================================== -->
-    <div v-if="modalVideoAberto" class="fixed inset-0 z-[60] bg-whitesmoke-950/40 backdrop-blur-sm animate-in fade-in duration-300" @click="modalVideoAberto = false"></div>
+    <!-- O modal de vídeo usa z-60 para ficar acima da execução e dos diálogos locais. -->
+    <Transition name="gy-modal" :duration="{ enter: 420, leave: 280 }" appear><div v-if="modalVideoAberto" :class="modalSheetBackdrop" @click="modalVideoAberto = false"></div></Transition>
 
-    <div v-if="modalVideoAberto" class="fixed inset-x-0 bottom-0 z-[70] flex flex-col bg-whitesmoke-50 rounded-t-[2.5rem] shadow-[0_-20px_40px_rgba(0,0,0,0.15)] animate-in slide-in-from-bottom-full duration-300 overflow-hidden max-h-[85vh]">
-      <div class="w-full flex justify-center pt-3 pb-1 shrink-0 bg-white">
-        <div class="w-12 h-1.5 bg-whitesmoke-200 rounded-full"></div>
-      </div>
-      <div class="px-6 py-4 flex items-center justify-between border-b border-whitesmoke-200/50 bg-white shrink-0">
-        <h3 class="font-black text-whitesmoke-950 text-base truncate pr-2">{{ videoTituloAtivo }}</h3>
-        <button @click="modalVideoAberto = false" class="p-2 bg-whitesmoke-100 rounded-full text-whitesmoke-500 hover:text-whitesmoke-950">
-          <X :size="18" />
-        </button>
-      </div>
+    <Transition name="gy-sheet" appear><div v-if="modalVideoAberto" role="dialog" aria-modal="true" aria-labelledby="video-treino-titulo" :class="modalSheetPanel">
+      <ModalSheetHeader :titulo="videoTituloAtivo" etiqueta="Demonstração" cor-classe="bg-amethyst-500" titulo-id="video-treino-titulo" @fechar="modalVideoAberto = false" />
       <div class="p-6 flex flex-col items-center justify-center bg-black min-h-[300px]">
         <iframe v-if="temConexao" :src="videoUrlAtivo" class="w-full aspect-video rounded-2xl shadow-lg border-0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
         <div v-else class="flex flex-col items-center justify-center text-center p-6 text-white gap-3">
@@ -202,7 +197,7 @@ onUnmounted(() => {
           <p class="text-xs text-white/60 max-w-xs">Não foi possível carregar o vídeo do YouTube porque o dispositivo não possui conexão com a internet.</p>
         </div>
       </div>
-    </div>
+    </div></Transition>
 
   </div>
 </template>

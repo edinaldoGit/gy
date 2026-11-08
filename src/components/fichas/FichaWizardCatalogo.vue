@@ -6,16 +6,13 @@ import { Search, Plus, Check, ChevronRight, Dumbbell, Shield, Activity, Zap, Hea
 import FichaWizardHeader from './FichaWizardHeader.vue'
 
 const store = useFichaStore()
-const { modo, termoBusca, fichaEditando, resultadosBusca, exerciciosAgrupados, modalCriarExAberto } = storeToRefs(store)
+const { modo, termoBusca, fichaEditando, treinoEditando, resultadosBusca, exerciciosAgrupados, modalCriarExAberto } = storeToRefs(store)
 const { voltar, toggleExercicio, isExercicioSelecionado, getCorObj } = store
 
 const categoriaAberta = ref<string | null>(null)
 const filtroEquipamento = ref<string>('Todos')
+const temaAtual = computed(() => getCorObj(treinoEditando.value.corTema || 'cerulean'))
 
-// Cor do tema geral do treino (definida na Etapa 1)
-const temaAtual = computed(() => getCorObj(fichaEditando.value.corTema || 'cerulean'))
-
-// Mapeamento explícito de classes de seleção
 const classesSelecao = computed(() => {
   const id = temaAtual.value.id
   const map: Record<string, { border: string, bg: string, text: string, hex: string }> = {
@@ -31,7 +28,6 @@ const classesSelecao = computed(() => {
   return map[id] || map['cerulean']
 })
 
-// Mapeamento de imagens locais para cada grupo muscular (com cores vivas reais)
 import peitoImg from '@/assets/peito.png'
 import costasImg from '@/assets/costas.png'
 import ombrosImg from '@/assets/ombros.png'
@@ -54,7 +50,6 @@ const imagensGrupos: Record<string, string> = {
   'Cardio': cardioImg
 }
 
-// Ícones de fallback caso alguma imagem não esteja presente
 const iconesGrupos: Record<string, any> = {
   'Peito': Shield,
   'Costas': Target,
@@ -71,7 +66,6 @@ const getIconeGrupo = (grupo: string) => {
   return iconesGrupos[grupo] || Dumbbell
 }
 
-// Garante que "Cardio" sempre apareça na lista de categorias
 const gruposComCardio = computed(() => {
   const agrupado = { ...exerciciosAgrupados.value }
   if (!agrupado['Cardio']) {
@@ -110,27 +104,27 @@ const abrirCategoria = (grupo: string) => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4 animate-in slide-in-from-right-4 h-[calc(100vh-120px)] relative bg-whitesmoke-50 rounded-t-[2.5rem]">
+  <div class="flex flex-col gap-4 animate-in slide-in-from-right-4 relative">
     
-    <!-- HEADER EM PÍLULA -->
     <FichaWizardHeader 
-      :titulo="categoriaAberta ? categoriaAberta : 'Catálogo'"
-      subtitulo="Etapa 2 de 3"
-      :corTemaBg="temaAtual.bg"
+      :titulo="categoriaAberta ? categoriaAberta : 'Selecionar exercícios'"
+      :subtitulo="fichaEditando.nome"
       :onVoltar="() => categoriaAberta ? fecharCategoria() : voltar()"
     >
       <template #acoes>
-        <button 
+        <button
+          type="button"
+          aria-label="Criar exercício"
           @click="modalCriarExAberto = true" 
-          class="flex items-center gap-1.5 px-3.5 h-10 rounded-full bg-white text-whitesmoke-950 font-black text-xs shadow-sm transition-all hover:bg-whitesmoke-100 active:scale-95 shrink-0"
+          class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-whitesmoke-950 shadow-sm transition-all hover:bg-whitesmoke-100 active:scale-95 sm:w-auto sm:gap-1.5 sm:px-3.5"
         >
-          <Plus :size="16" stroke-width="3" :class="temaAtual.text" />
-          <span>Novo Exercício</span>
+          <Plus :size="18" stroke-width="3" class="text-cerulean-600" />
+          <span class="hidden text-xs font-black sm:inline">Novo Exercício</span>
         </button>
       </template>
     </FichaWizardHeader>
 
-    <!-- BARRA DE BUSCA -->
+    <p class="px-4 text-xs font-semibold text-whitesmoke-500">Etapa 2 de 3 · Selecione os exercícios de {{ treinoEditando.nome }}</p>
     <div class="relative shrink-0 px-4 mt-2">
       <Search :size="18" class="absolute left-8 top-1/2 -translate-y-1/2 text-whitesmoke-400" />
       <input 
@@ -144,9 +138,8 @@ const abrirCategoria = (grupo: string) => {
       />
     </div>
 
-    <div class="flex-1 overflow-y-auto px-4 pb-24">
+    <div class="px-4 pb-6">
       
-      <!-- VISÃO 1: BUSCA GLOBAL -->
       <div v-if="termoBusca" class="flex flex-col gap-3 animate-in fade-in">
         <div class="grid grid-cols-2 gap-3">
           <div 
@@ -168,14 +161,12 @@ const abrirCategoria = (grupo: string) => {
         </div>
       </div>
 
-      <!-- VISÃO 2: CARDS DE GRUPOS MUSCULARES (Com Cardio e imagens completas) -->
       <div v-else-if="!categoriaAberta" class="grid grid-cols-2 gap-3 animate-in slide-in-from-left-4 duration-300">
         <div 
           v-for="(lista, grupo) in gruposComCardio" :key="grupo"
           @click="abrirCategoria(String(grupo))"
           class="bg-white rounded-[1.5rem] p-4 cursor-pointer relative overflow-hidden transition-all duration-300 active:scale-95 shadow-sm border border-whitesmoke-200 hover:border-whitesmoke-300 flex flex-col justify-between h-28 group"
         >
-          <!-- IMAGEM DE FUNDO LATERAL DIREITA -->
           <template v-if="imagensGrupos[String(grupo)]">
             <div class="absolute right-0 top-0 h-full z-0 pointer-events-none overflow-hidden flex items-center justify-end">
               <img 
@@ -187,7 +178,6 @@ const abrirCategoria = (grupo: string) => {
             </div>
           </template>
 
-          <!-- ÍCONE NO TOPO ESQUERDO -->
           <div class="flex items-center justify-between relative z-10">
             <span v-if="!imagensGrupos[String(grupo)]" class="w-9 h-9 rounded-2xl bg-whitesmoke-100 flex items-center justify-center text-whitesmoke-700 group-hover:scale-110 transition-transform shadow-sm">
               <component :is="getIconeGrupo(String(grupo))" :size="18" stroke-width="2.2" />
@@ -207,9 +197,8 @@ const abrirCategoria = (grupo: string) => {
         </div>
       </div>
 
-      <!-- VISÃO 3: DENTRO DA CATEGORIA -->
       <div v-else class="flex flex-col gap-4 animate-in slide-in-from-right-4 duration-300">
-        <div class="flex overflow-x-auto gap-2 pb-1 -mx-4 px-4 no-scrollbar hide-scroll">
+        <div class="flex overflow-x-auto gap-2 pb-1 -mx-4 px-4 gy-scrollbar-hidden">
           <button 
             v-for="equip in equipamentosDisponiveis" :key="equip"
             @click="filtroEquipamento = equip"
@@ -248,24 +237,20 @@ const abrirCategoria = (grupo: string) => {
 
     </div>
 
-    <!-- BOTÃO FLUTUANTE -->
-    <div class="absolute bottom-6 left-0 right-0 px-4 z-20">
+    <div class="px-4 pb-4">
       <button 
         @click="modo = 'step3'"
-        :disabled="(fichaEditando.exercicios?.length || 0) === 0"
-        class="w-full text-white disabled:opacity-50 disabled:active:scale-100 font-black text-sm py-4 rounded-[1.25rem] flex items-center justify-between px-6 transition-all shadow-xl active:scale-[0.98]"
-        :class="[temaAtual.bg, `hover:bg-${temaAtual.id}-600`, `shadow-${temaAtual.id}-500/30`]"
+        :disabled="!treinoEditando.nome.trim() || (treinoEditando.exercicios?.length || 0) === 0"
+        class="flex w-full items-center justify-between rounded-[1.25rem] bg-cerulean-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-cerulean-500/30 transition-all hover:bg-cerulean-600 active:scale-[0.98] disabled:active:scale-100 disabled:opacity-50"
       >
-        <span>{{ fichaEditando.exercicios?.length }} EXERCÍCIOS</span>
-        <div class="flex items-center gap-2">CONFIGURAR SÉRIES <ChevronRight :size="18"/></div>
+        <span>{{ treinoEditando.exercicios?.length }} EXERCÍCIOS</span>
+        <div class="flex items-center gap-2">AJUSTAR SÉRIES <ChevronRight :size="18"/></div>
       </button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.hide-scroll::-webkit-scrollbar { display: none; }
-.hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
 .fade-enter-from, .fade-leave-to { opacity: 0; transform: translateY(-5px); }
 </style>

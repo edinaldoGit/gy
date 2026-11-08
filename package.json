@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "for file in tests/*.test.mjs; do node --experimental-strip-types --test-reporter=spec \"$file\" || exit; done"
   },
   "dependencies": {
     "dexie": "^4.4.6",

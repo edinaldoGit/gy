@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
+import { onBeforeRouteLeave } from 'vue-router'
 
 import TreinoPreview from '@/components/treino/TreinoPreview.vue'
 import TreinoExecucao from '@/components/treino/TreinoExecucao.vue'
@@ -12,6 +13,30 @@ const { estadoAtual } = storeToRefs(store)
 
 onMounted(() => {
   store.carregarTreinoDoDia()
+  window.addEventListener('pagehide', salvarSessaoAntesDeFechar)
+  document.addEventListener('visibilitychange', salvarSessaoAoOcultar)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('pagehide', salvarSessaoAntesDeFechar)
+  document.removeEventListener('visibilitychange', salvarSessaoAoOcultar)
+})
+
+const salvarSessaoAntesDeFechar = () => {
+  void store.persistirSessaoAgora()
+}
+
+const salvarSessaoAoOcultar = () => {
+  if (document.visibilityState === 'hidden') {
+    void store.persistirSessaoAgora()
+  }
+}
+
+onBeforeRouteLeave(async () => {
+  if (store.sessaoEstado === 'em_andamento') {
+    return await store.persistirSessaoAgora()
+  }
+  return true
 })
 </script>
 

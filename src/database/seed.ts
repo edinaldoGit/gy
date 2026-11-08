@@ -236,9 +236,8 @@ const catalogoBruto = [
   {"id":233,"nome":"Vácuo Abdominal","grupoMuscular":"Abdômen","videoUrl":"https://youtu.be/qvdiga5sQvQ"}
 ];
 
-// 2. Mapeamento Inteligente: Deduz o equipamento pelo nome e preenche os defaults
 const exerciciosSeed = catalogoBruto.map(ex => {
-  let equip = "Peso Corporal"; // Default
+  let equip = "Peso Corporal";
   const nomeLower = ex.nome.toLowerCase();
   
   if (nomeLower.includes("máquina") || nomeLower.includes("smith") || nomeLower.includes("hack") || nomeLower.includes("peck deck")) {

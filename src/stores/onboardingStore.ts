@@ -13,7 +13,6 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     fotoPerfil: ''
   })
 
-  // --- NOVA FUNÇÃO DE COMPRESSÃO E REDIMENSIONAMENTO ---
   const comprimirImagem = (file: File, maxTamanho = 300, qualidade = 0.8): Promise<string> => {
     return new Promise((resolve) => {
       const reader = new FileReader()
@@ -24,7 +23,6 @@ export const useOnboardingStore = defineStore('onboarding', () => {
           let largura = img.width
           let altura = img.height
 
-          // Calcula as proporções para caber num quadrado maxTamanho x maxTamanho
           if (largura > altura) {
             if (largura > maxTamanho) {
               altura = Math.round((altura * maxTamanho) / largura)
@@ -43,7 +41,6 @@ export const useOnboardingStore = defineStore('onboarding', () => {
           const ctx = canvas.getContext('2d')
           ctx?.drawImage(img, 0, 0, largura, altura)
 
-          // Converte o canvas para uma string Base64 compactada em JPEG
           resolve(canvas.toDataURL('image/jpeg', qualidade))
         }
         img.src = e.target?.result as string
@@ -56,7 +53,6 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     const target = event.target as HTMLInputElement
     const file = target.files?.[0]
     if (file) {
-      // Chama a função de redimensionar antes de salvar no form
       const imagemCompactada = await comprimirImagem(file, 300, 0.8)
       form.value.fotoPerfil = imagemCompactada
     }

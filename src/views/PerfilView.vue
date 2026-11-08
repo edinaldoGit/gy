@@ -1,13 +1,15 @@
 <script setup lang="ts">
+import { feedback } from '@/composables/useFeedback'
+import { confirmation } from '@/composables/useConfirm'
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { db, type Perfil } from '@/database/db'
 import { UserRound, Ruler, Weight, CalendarDays, Activity, Trash2 } from 'lucide-vue-next'
+import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
 
 const router = useRouter()
 const usuario = ref<Perfil | null>(null)
 
-// Busca os dados do usuário no IndexedDB ao carregar a tela
 onMounted(async () => {
   const perfil = await db.perfil.toCollection().first()
   if (perfil) {
@@ -15,7 +17,6 @@ onMounted(async () => {
   }
 })
 
-// Calcula o IMC baseado no peso e altura (altura salva em cm)
 const imc = computed(() => {
   if (!usuario.value) return '0.0'
   const alturaEmMetros = usuario.value.altura / 100
@@ -23,7 +24,6 @@ const imc = computed(() => {
   return calculo.toFixed(1)
 })
 
-// Função para formatar a data de criação
 const dataCriacao = computed(() => {
   if (!usuario.value?.criadoEm) return ''
   return new Intl.DateTimeFormat('pt-BR', { 
@@ -32,20 +32,22 @@ const dataCriacao = computed(() => {
   }).format(usuario.value.criadoEm)
 })
 
-// Função para resetar o app
 const apagarDados = async () => {
-  const confirmar = confirm('Tem certeza que deseja apagar todos os seus dados? Isso não pode ser desfeito.')
-  if (confirmar) {
-    await db.perfil.clear() 
-    router.push('/onboarding')
-  }
+  const confirmado = await confirmation.ask({
+    title: 'Excluir seus dados de perfil?',
+    message: 'Seu nome, foto, idade, peso e altura serão removidos deste dispositivo. Essa ação não poderá ser desfeita.',
+    details: 'Fichas, treinos e histórico permanecerão armazenados. Você voltará ao cadastro inicial.',
+    variant: 'error', icon: 'trash', cancelText: 'Manter perfil', confirmText: 'Excluir perfil',
+    action: () => db.perfil.clear()
+  })
+  if (confirmado) { feedback.success('Dados de perfil excluídos.'); await router.push('/onboarding') }
 }
 </script>
 
 <template>
   <div v-if="usuario" class="flex flex-col gap-6 pb-20 animate-in fade-in duration-500">
+    <SectionPageHeader titulo="Meu Perfil" subtitulo="Seus dados e evolução" tema="perfil" />
     
-    <!-- Cabeçalho do Perfil -->
     <div class="flex flex-col items-center mt-4">
       <div class="w-28 h-28 rounded-full bg-white shadow-lg flex items-center justify-center overflow-hidden border-4 border-white relative z-10">
         <img v-if="usuario.fotoPerfil" :src="usuario.fotoPerfil" class="w-full h-full object-cover" />
@@ -61,9 +63,7 @@ const apagarDados = async () => {
       </div>
     </div>
 
-    <!-- Grid de Estatísticas -->
     <div class="grid grid-cols-2 gap-4">
-      <!-- Altura -->
       <div class="bg-white rounded-3xl p-5 shadow-sm border border-whitesmoke-200 flex flex-col gap-3">
         <div class="w-10 h-10 rounded-full bg-bubblegum-50 flex items-center justify-center text-bubblegum-500">
           <Ruler :size="20" />
@@ -77,7 +77,6 @@ const apagarDados = async () => {
         </div>
       </div>
 
-      <!-- Peso -->
       <div class="bg-white rounded-3xl p-5 shadow-sm border border-whitesmoke-200 flex flex-col gap-3">
         <div class="w-10 h-10 rounded-full bg-bubblegum-50 flex items-center justify-center text-bubblegum-500">
           <Weight :size="20" />
@@ -91,7 +90,6 @@ const apagarDados = async () => {
         </div>
       </div>
 
-      <!-- Idade -->
       <div class="bg-white rounded-3xl p-5 shadow-sm border border-whitesmoke-200 flex flex-col gap-3">
         <div class="w-10 h-10 rounded-full bg-bubblegum-50 flex items-center justify-center text-bubblegum-500">
           <UserRound :size="20" />
@@ -105,7 +103,6 @@ const apagarDados = async () => {
         </div>
       </div>
 
-      <!-- IMC -->
       <div class="bg-white rounded-3xl p-5 shadow-sm border border-whitesmoke-200 flex flex-col gap-3">
         <div class="w-10 h-10 rounded-full bg-bubblegum-50 flex items-center justify-center text-bubblegum-500">
           <Activity :size="20" />
@@ -125,10 +122,10 @@ const apagarDados = async () => {
         class="w-full bg-white border border-red-100 text-red-500 hover:bg-red-50 font-bold py-4 rounded-2xl flex items-center justify-center transition-all shadow-sm active:scale-[0.98]"
       >
         <Trash2 :size="20" class="mr-2" />
-        Apagar Meus Dados
+        Excluir dados do perfil
       </button>
       <p class="text-[10px] text-center text-whitesmoke-400 mt-3 px-4">
-        Ao apagar seus dados, você será redirecionado para a tela inicial e perderá todo o histórico de treinos.
+        Remove somente seus dados de perfil. Fichas, treinos e histórico permanecem neste dispositivo.
       </p>
     </div>
 

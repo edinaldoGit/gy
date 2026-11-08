@@ -6,12 +6,12 @@ import { Clock, Check, Trash2, Save, Timer } from 'lucide-vue-next'
 import FichaWizardHeader from './FichaWizardHeader.vue'
 
 const store = useFichaStore()
-const { fichaEditando, descansoGlobal } = storeToRefs(store)
+const { treinoEditando, descansoGlobal, catalogo, contextoWizard } = storeToRefs(store)
 const { voltar, removerExercicioDaFicha, salvarFicha, getCorObj } = store
 
 const aplicarDescansoLocal = () => {
-  if (!fichaEditando.value.exercicios) return
-  fichaEditando.value.exercicios.forEach((ex: any) => {
+  if (!treinoEditando.value.exercicios) return
+  treinoEditando.value.exercicios.forEach((ex: any) => {
     if (ex.temDescanso !== false) {
       ex.descansoSegundos = descansoGlobal.value
     }
@@ -22,26 +22,23 @@ const toggleDescansoExercicio = (ex: any) => {
   ex.temDescanso = ex.temDescanso === false ? true : false
 }
 
-const temaAtual = computed(() => getCorObj(fichaEditando.value.corTema || 'cerulean'))
+const temaAtual = computed(() => getCorObj(treinoEditando.value.corTema || 'cerulean'))
+const nomeExercicio = (id: number) => catalogo.value.find(ex => ex.id === id)
 </script>
 
 <template>
-  <div class="flex flex-col h-[calc(100vh-120px)] relative bg-whitesmoke-50 rounded-t-[2.5rem] overflow-hidden">
+  <div class="flex flex-col relative">
     
-    <!-- HEADER FIXO NO TOPO -->
-    <div class="shrink-0 pb-2">
-      <FichaWizardHeader 
-        titulo="Ajuste Fino"
-        subtitulo="Etapa Final"
-        :corTemaBg="temaAtual.bg"
-        :onVoltar="voltar"
-      />
-    </div>
+    <FichaWizardHeader
+      titulo="Séries e repetições"
+      :subtitulo="treinoEditando.nome"
+      :onVoltar="voltar"
+    />
 
-    <!-- ÁREA DE ROLAGEM ÚNICA (Cards + Botão no mesmo fluxo) -->
-    <div class="flex-1 overflow-y-auto px-4 pt-1 pb-6 flex flex-col gap-4">
+    <p class="px-4 py-3 text-xs font-semibold text-whitesmoke-500">Etapa 3 de 3 · Ajuste as séries e repetições antes de salvar</p>
+
+    <div class="px-4 pt-1 pb-6 flex flex-col gap-4">
       
-      <!-- PAINEL GLOBAL -->
       <div class="bg-white rounded-[1.5rem] p-4 shadow-sm border border-whitesmoke-200 flex items-center justify-between">
         <div>
           <h4 class="text-sm font-bold text-whitesmoke-950 flex items-center gap-1.5">
@@ -66,9 +63,8 @@ const temaAtual = computed(() => getCorObj(fichaEditando.value.corTema || 'cerul
         </div>
       </div>
 
-      <!-- LISTA DE EXERCÍCIOS -->
       <div 
-        v-for="(ex, index) in fichaEditando.exercicios" 
+        v-for="(ex, index) in treinoEditando.exercicios"
         :key="index"
         class="bg-white rounded-[1.5rem] p-4 shadow-sm border transition-colors"
         :class="(ex as any).temDescanso !== false ? 'border-whitesmoke-200' : 'border-whitesmoke-200 opacity-80'"
@@ -79,8 +75,8 @@ const temaAtual = computed(() => getCorObj(fichaEditando.value.corTema || 'cerul
               {{ index + 1 }}
             </div>
             <div>
-              <h4 class="text-sm font-bold text-whitesmoke-950 pr-4 truncate max-w-[180px]">{{ (ex as any)._nomeDisplay }}</h4>
-              <p class="text-[10px] font-bold text-whitesmoke-400 uppercase tracking-widest mt-0.5">{{ (ex as any)._grupoDisplay }}</p>
+              <h4 class="text-sm font-bold text-whitesmoke-950 pr-4 truncate max-w-[180px]">{{ nomeExercicio(ex.exercicioId)?.nome || 'Exercício indisponível' }}</h4>
+              <p class="text-[10px] font-bold text-whitesmoke-400 uppercase tracking-widest mt-0.5">{{ nomeExercicio(ex.exercicioId)?.grupoMuscular || 'Exercício personalizado' }}</p>
             </div>
           </div>
           <button @click="removerExercicioDaFicha(index)" class="text-red-400 p-2 hover:bg-red-50 rounded-xl transition-colors shrink-0">
@@ -103,7 +99,6 @@ const temaAtual = computed(() => getCorObj(fichaEditando.value.corTema || 'cerul
             <input type="number" v-model.number="ex.taxaAumentoKg" class="w-full bg-transparent text-center font-semibold text-whitesmoke-950 text-sm outline-none" />
           </div>
           
-          <!-- CONTROLE INDIVIDUAL DE DESCANSO -->
           <div class="bg-teal-50/50 rounded-xl p-2 border flex flex-col items-center justify-between" :class="(ex as any).temDescanso !== false ? 'border-teal-100' : 'border-whitesmoke-200 grayscale opacity-50'">
             <div class="w-full flex items-center justify-between px-1">
               <Timer :size="12" class="text-teal-600" />
@@ -119,15 +114,15 @@ const temaAtual = computed(() => getCorObj(fichaEditando.value.corTema || 'cerul
         </div>
       </div>
 
-      <!-- BOTÃO SALVAR (Agora dentro da rolagem, logo após o último card) -->
       <div class="mt-2 mb-4">
         <button 
           @click="salvarFicha"
-          class="w-full text-white font-black text-sm py-4 rounded-[1.25rem] flex items-center justify-center gap-2 transition-all shadow-md active:scale-[0.98]"
-          :class="[temaAtual.bg, `hover:bg-${temaAtual.id}-600`]"
+          :disabled="store.salvando"
+          :aria-busy="store.salvando"
+          class="flex w-full items-center justify-center gap-2 rounded-[1.25rem] bg-cerulean-500 py-4 text-sm font-black text-white shadow-md transition-all hover:bg-cerulean-600 active:scale-[0.98]"
         >
           <Save :size="20" />
-          SALVAR TREINO
+          {{ store.salvando ? 'SALVANDO…' : contextoWizard === 'editar-treino' ? 'SALVAR ALTERAÇÕES' : 'SALVAR TREINO NA FICHA' }}
         </button>
       </div>
 
