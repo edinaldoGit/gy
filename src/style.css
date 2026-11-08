@@ -8,20 +8,20 @@
   /* Bubblegum Pink */
   --color-bubblegum-50: #fee6e8;
 
-  /* Bubblegum Pink (Ideal para ações destrutivas, alertas ou botões de destaque) */
-  --color-bubblegum-50: #fee6e8;
-  --color-bubblegum-100: #fecdd1;
-  --color-bubblegum-200: #fd9ba3;
-  --color-bubblegum-300: #fc6975;
-  --color-bubblegum-400: #fb3747;
-  --color-bubblegum-500: #fa0519;
-  --color-bubblegum-600: #c80414;
-  --color-bubblegum-700: #96030f;
-  --color-bubblegum-800: #64020a;
-  --color-bubblegum-900: #320105;
-  --color-bubblegum-950: #230104;
+  /* Bubblegum Pink (Ações destrutivas, alertas ou botões de destaque) */
+  --color-bubblegum-50: #fff0f1;
+  --color-bubblegum-100: #ffe1e4;
+  --color-bubblegum-200: #ffc8ce;
+  --color-bubblegum-300: #ffa2ab;
+  --color-bubblegum-400: #fc7a86;
+  --color-bubblegum-500: #fc6471;
+  --color-bubblegum-600: #e34855;
+  --color-bubblegum-700: #be323f;
+  --color-bubblegum-800: #9e2a35;
+  --color-bubblegum-900: #85262f;
+  --color-bubblegum-950: #490f15;
 
-  /* Amethyst (Excelente para a cor Primária: botões de ação principal, ícones ativos) */
+  /* Amethyst (Cor Primária: botões de ação principal, ícones ativos) */
   --color-amethyst-50: #f5ecf8;
   --color-amethyst-100: #ebdaf1;
   --color-amethyst-200: #d7b4e4;
@@ -34,7 +34,7 @@
   --color-amethyst-900: #1f0e25;
   --color-amethyst-950: #16091a;
 
-  /* White Smoke (A base estrutural: fundos, cards, modais e textos) */
+  /* White Smoke (Base estrutural: fundos, cards, modais e textos) */
   --color-whitesmoke-50: #f4f1f1;
   --color-whitesmoke-100: #e9e2e4;
   --color-whitesmoke-200: #d2c6c9;
@@ -47,7 +47,7 @@
   --color-whitesmoke-900: #1d1618;
   --color-whitesmoke-950: #141011;
 
-  /* Tropical Teal (Ótimo para ações secundárias, botões de confirmar/sucesso ou gráficos) */
+  /* Tropical Teal (Ações secundárias, botões de confirmar/sucesso ou gráficos) */
   --color-teal-50: #edf6f7;
   --color-teal-100: #dceeef;
   --color-teal-200: #b9dcdf;
@@ -74,9 +74,9 @@
   --color-cerulean-950: #07161d;
 }
 
-/* Configuração global do corpo do aplicativo (Tema Dark por padrão) */
+/* Configuração global do corpo do aplicativo (Tema Claro) */
 @layer base {
   body {
-    @apply bg-whitesmoke-950 text-whitesmoke-50 antialiased;
+    @apply bg-whitesmoke-50 text-whitesmoke-950 antialiased;
   }
 }

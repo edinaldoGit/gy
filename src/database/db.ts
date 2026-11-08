@@ -6,6 +6,7 @@ export interface Perfil {
   idade: number;
   peso: number;
   altura: number;
+  fotoPerfil?: string;
   criadoEm: Date;
 }
 
