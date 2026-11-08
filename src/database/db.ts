@@ -22,19 +22,22 @@ export interface ExercicioCatalogo {
 
 export interface Ficha {
   id?: number;
-  nome: string; 
-  foco: string; 
+  nome: string;
+  foco: string;
+  corTema: string;
+  diasDaSemana?: number[]; 
   exercicios: ExercicioNaFicha[];
   criadoEm: Date;
 }
 
 export interface ExercicioNaFicha {
-  exercicioId: number; 
+  exercicioId: number;
   ordem: number; 
   series: number; 
   repsAlvo: string; 
   taxaAumentoKg: number; 
-  pesoBaseAtual: number;
+  descansoSegundos: number;
+  pesoBaseAtual: number; 
   substitutosIds: number[]; 
 }
 

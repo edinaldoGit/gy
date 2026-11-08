@@ -6,13 +6,10 @@ import {
   CheckCheck, RotateCcw, Trophy, ArrowRightLeft
 } from 'lucide-vue-next'
 
-// --- ESTADOS DA TELA ---
 const isTreinoAtivo = ref(false)
 const treinoFinalizadoHoje = ref(false)
 const exercicioExpandido = ref<number | null>(1)
 const cronometro = ref('00:00')
-
-// --- DADOS SIMULADOS (Múltiplos Treinos para a funcionalidade de Troca) ---
 const mockTreinoA = {
   id: 1, nome: 'Treino A', foco: 'Peito, Ombro e Tríceps', tempoEstimado: '45-60',
   exercicios: [
@@ -32,17 +29,13 @@ const mockTreinoB = {
 }
 
 const treinoHoje = ref(mockTreinoA)
-const proximoTreinoNome = ref('Treino B - Costas e Bíceps') // Simulação de quem vem amanhã
-
-// --- LÓGICA DO TREINO ---
+const proximoTreinoNome = ref('Treino B - Costas e Bíceps') 
 const trocarTreino = () => {
-  // Alterna entre A e B apenas para simular a escolha do usuário no dia
   treinoHoje.value = treinoHoje.value.id === 1 ? mockTreinoB : mockTreinoA
 }
 
 const iniciarTreino = () => {
   isTreinoAtivo.value = true
-  // Pré-gera os inputs das séries com a matemática inteligente
   treinoHoje.value.exercicios.forEach(ex => {
     ex.seriesRealizadas = Array.from({ length: ex.series }).map((_, index) => ({
       numero: index + 1,
@@ -63,11 +56,10 @@ const autoExpandirProximo = (atualId: number) => {
   if (proximo && !proximo.concluido) {
     exercicioExpandido.value = proximo.id
   } else {
-    exercicioExpandido.value = null // Fecha se for o último
+    exercicioExpandido.value = null
   }
 }
 
-// Checkbox Individual
 const concluirSerie = (exercicioId: number, serieIndex: number) => {
   const ex = treinoHoje.value.exercicios.find(e => e.id === exercicioId)
   if (ex) {
@@ -78,7 +70,6 @@ const concluirSerie = (exercicioId: number, serieIndex: number) => {
   }
 }
 
-// Botão "Concluir Tudo"
 const concluirTodasSeries = (exercicioId: number) => {
   const ex = treinoHoje.value.exercicios.find(e => e.id === exercicioId)
   if (ex) {
@@ -88,7 +79,6 @@ const concluirTodasSeries = (exercicioId: number) => {
   }
 }
 
-// Botão "Resetar"
 const resetarExercicio = (exercicioId: number) => {
   const ex = treinoHoje.value.exercicios.find(e => e.id === exercicioId)
   if (ex) {
@@ -97,9 +87,7 @@ const resetarExercicio = (exercicioId: number) => {
   }
 }
 
-// Botão "Finalizar Treino"
 const finalizarTreino = () => {
-  // Aqui no futuro salvaremos no Dexie o histórico
   isTreinoAtivo.value = false
   treinoFinalizadoHoje.value = true
 }
@@ -113,10 +101,6 @@ const progressoTreino = computed(() => {
 
 <template>
   <div class="flex flex-col gap-6 pb-8 animate-in fade-in duration-500">
-    
-    <!-- ========================================== -->
-    <!-- ESTADO 3: TREINO FINALIZADO (Sucesso)      -->
-    <!-- ========================================== -->
     <div v-if="treinoFinalizadoHoje" class="flex flex-col items-center justify-center pt-10 px-4 animate-in zoom-in-95 duration-500">
       <div class="w-24 h-24 bg-teal-500 rounded-full flex items-center justify-center shadow-lg shadow-teal-500/30 mb-6 border-4 border-teal-50">
         <Trophy :size="48" class="text-white" />
@@ -130,9 +114,6 @@ const progressoTreino = computed(() => {
       </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- ESTADO 1: PREVIEW (Antes de Iniciar)       -->
-    <!-- ========================================== -->
     <div v-else-if="!isTreinoAtivo" class="flex flex-col gap-6">
       
       <div class="px-2 mt-2">
@@ -140,7 +121,6 @@ const progressoTreino = computed(() => {
         <p class="text-sm text-whitesmoke-500 mt-1">Este é o seu planejamento para hoje.</p>
       </div>
 
-      <!-- Card Principal -->
       <div class="bg-amethyst-500 rounded-[2rem] p-1 shadow-lg shadow-amethyst-500/20 relative overflow-hidden">
         <div class="absolute -right-6 -top-6 text-white/10 rotate-12 pointer-events-none">
           <Dumbbell :size="120" stroke-width="1.5" />
@@ -148,7 +128,6 @@ const progressoTreino = computed(() => {
         
         <div class="bg-amethyst-600/20 rounded-[1.8rem] p-5 backdrop-blur-sm border border-white/10 relative z-10 flex flex-col gap-5">
           <div>
-            <!-- Botão de Trocar Ficha -->
             <div class="flex items-center justify-between mb-1">
               <span class="bg-white/20 text-white text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full backdrop-blur-md">
                 Ficha Principal
@@ -184,7 +163,6 @@ const progressoTreino = computed(() => {
         </div>
       </div>
 
-      <!-- Lista de Exercícios -->
       <div class="flex flex-col gap-4">
         <h3 class="text-lg font-bold text-whitesmoke-950 px-2">Visão Geral</h3>
         <div class="bg-white rounded-3xl p-2 shadow-sm border border-whitesmoke-200 flex flex-col">
@@ -208,16 +186,10 @@ const progressoTreino = computed(() => {
       </div>
     </div>
 
-    <!-- ========================================== -->
-    <!-- ESTADO 2: EXECUÇÃO (Sanfona + Progresso)   -->
-    <!-- ========================================== -->
     <div v-else class="flex flex-col gap-4 animate-in slide-in-from-right-4 duration-500 pb-20">
-      
-      <!-- Cabeçalho Fixo do Treino Ativo -->
       <div class="flex items-center justify-between px-2 mb-2 sticky top-0 z-30 bg-whitesmoke-50/90 backdrop-blur-md py-2 -mx-2 px-4 rounded-b-2xl shadow-sm">
         <div class="flex flex-col">
           <h2 class="text-xl font-black text-whitesmoke-950">{{ treinoHoje.nome }}</h2>
-          <!-- Barra de Progresso Minimalista -->
           <div class="flex items-center gap-2 mt-1.5">
             <div class="w-24 h-1.5 bg-whitesmoke-200 rounded-full overflow-hidden">
               <div class="h-full bg-teal-500 transition-all duration-500" :style="{ width: progressoTreino.porcentagem + '%' }"></div>
@@ -231,7 +203,6 @@ const progressoTreino = computed(() => {
         </div>
       </div>
 
-      <!-- Sanfona -->
       <div class="flex flex-col gap-3">
         <div 
           v-for="(exercicio, index) in treinoHoje.exercicios" 
@@ -242,7 +213,6 @@ const progressoTreino = computed(() => {
             exercicio.concluido && exercicioExpandido !== exercicio.id ? 'opacity-60 bg-whitesmoke-50' : ''
           ]"
         >
-          <!-- Cabeçalho (Clicável) -->
           <div @click="alternarSanfona(exercicio.id)" class="flex items-center gap-4 p-4 cursor-pointer select-none">
             <div class="w-12 h-12 rounded-full flex items-center justify-center shrink-0 transition-colors"
               :class="[exercicio.concluido ? 'bg-teal-500 text-white' : exercicioExpandido === exercicio.id ? 'bg-amethyst-500 text-white' : 'bg-amethyst-50 text-amethyst-500']">
@@ -256,7 +226,6 @@ const progressoTreino = computed(() => {
             <ChevronDown :size="20" class="text-whitesmoke-400 transition-transform duration-300" :class="{'rotate-180 text-amethyst-500': exercicioExpandido === exercicio.id}" />
           </div>
 
-          <!-- Corpo do Exercício -->
           <div class="grid transition-all duration-500 ease-in-out" :class="exercicioExpandido === exercicio.id ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
             <div class="overflow-hidden">
               <div class="p-4 pt-0 border-t border-whitesmoke-100 mt-2">
@@ -269,8 +238,6 @@ const progressoTreino = computed(() => {
                     <LineChart :size="12" /> EVOLUÇÃO
                   </button>
                 </div>
-
-                <!-- Cabecalho das Series com Ações Rápidas (Check All / Reset) -->
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center px-2 text-[10px] font-bold text-whitesmoke-400 uppercase tracking-widest gap-4">
                     <span class="w-8 text-center">Série</span>
@@ -313,7 +280,6 @@ const progressoTreino = computed(() => {
         </div>
       </div>
 
-      <!-- Botão Flutuante de Finalizar Treino -->
       <button 
         @click="finalizarTreino"
         class="w-full bg-whitesmoke-950 hover:bg-black text-white font-black text-sm py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-lg active:scale-[0.98] mt-4"
