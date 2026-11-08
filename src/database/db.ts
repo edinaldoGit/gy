@@ -72,6 +72,9 @@ export interface ProgramacaoVigente {
   id?: number;
   fichaId: number | null;
   efetivaEm: Date;
+  diaLocalVigencia?: string;
+  fusoHorario?: string;
+  offsetMinutos?: number;
   motivo: 'ativacao' | 'troca' | 'edicao' | 'desativacao';
   fichaNome: string | null;
   treinos: Array<{ treinoId: number; treinoNome: string; diasDaSemana: number[] }>;
@@ -87,6 +90,9 @@ export interface HistoricoTreino {
   fichaCorTema?: string;
   dataInicio: Date;
   dataFim?: Date;
+  diaConclusaoLocal?: string;
+  fusoConclusao?: string;
+  offsetConclusaoMinutos?: number;
   estado: 'em_andamento' | 'finalizado' | 'cancelado';
   duracaoMinutos: number;
   /** Snapshot completo do treino e dos exercícios no início da sessão. */

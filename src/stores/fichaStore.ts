@@ -103,12 +103,14 @@ export const useFichaStore = defineStore('ficha', () => {
       descricao: fichaEditando.value.descricao?.trim() || '', corTema: fichaEditando.value.corTema || 'cerulean',
       origem: fichaEditando.value.origem || 'local', criadoEm: existente?.criadoEm || fichaEditando.value.criadoEm || agora, atualizadoEm: agora
     }
-    ficha.id = await db.fichas.put(ficha)
+    await db.transaction('rw', db.fichas, db.configuracoes, db.treinos, db.programacoes, async () => {
+      ficha.id = await db.fichas.put(ficha)
+      if (existente) {
+        const config = await db.configuracoes.get('principal')
+        if (config?.fichaAtivaId === ficha.id) await registrarProgramacao(ficha.id, 'edicao')
+      }
+    })
     fichaEditando.value.id = ficha.id
-    if (existente) {
-      const config = await db.configuracoes.get('principal')
-      if (config?.fichaAtivaId === ficha.id) await registrarProgramacao(ficha.id, 'edicao')
-    }
     await carregarDados()
     feedback.success(existente ? 'Ficha atualizada com sucesso!' : 'Ficha criada com sucesso!')
     return true
@@ -173,8 +175,10 @@ export const useFichaStore = defineStore('ficha', () => {
       })),
       criadoEm: anterior?.criadoEm || agora, atualizadoEm: agora
     }
-    await db.transaction('rw', db.treinos, async () => { await db.treinos.put(treino) })
-    if ((await db.configuracoes.get('principal'))?.fichaAtivaId === fichaId) await registrarProgramacao(fichaId, 'edicao')
+    await db.transaction('rw', db.treinos, db.configuracoes, db.fichas, db.programacoes, async () => {
+      await db.treinos.put(treino)
+      if ((await db.configuracoes.get('principal'))?.fichaAtivaId === fichaId) await registrarProgramacao(fichaId, 'edicao')
+    })
     await carregarDados()
     fichaSelecionada.value = fichaAtivaLocalizada()
     modo.value = 'detalhe'
@@ -185,7 +189,8 @@ export const useFichaStore = defineStore('ficha', () => {
   const registrarProgramacao = async (fichaId: number | null, motivo: 'ativacao' | 'troca' | 'edicao' | 'desativacao') => {
     const ficha = fichaId === null ? null : await db.fichas.get(fichaId)
     const treinos = fichaId === null ? [] : await db.treinos.where('fichaId').equals(fichaId).toArray()
-    await db.programacoes.add(snapshotProgramacao(ficha || null, treinos, motivo))
+    const ultima = await db.programacoes.orderBy('efetivaEm').last()
+    await db.programacoes.add(snapshotProgramacao(ficha || null, treinos, motivo, new Date(), ultima?.diaLocalVigencia))
   }
   const ativarFicha = async (id: number) => {
     const ficha = await db.fichas.get(id)
@@ -200,8 +205,7 @@ export const useFichaStore = defineStore('ficha', () => {
       if (anterior?.fichaAtivaId === id) return
       const config: ConfiguracaoApp = { chave: 'principal', fichaAtivaId: id }
       await db.configuracoes.put(config)
-      const treinos = await db.treinos.where('fichaId').equals(id).toArray()
-      await db.programacoes.add(snapshotProgramacao(ficha, treinos, anterior?.fichaAtivaId == null ? 'ativacao' : 'troca'))
+      await registrarProgramacao(id, anterior?.fichaAtivaId == null ? 'ativacao' : 'troca')
     })
     if (sessaoAtiva) return { ok: false as const, sessaoAtiva: true as const }
     await carregarDados()
@@ -220,7 +224,7 @@ export const useFichaStore = defineStore('ficha', () => {
       const config = await db.configuracoes.get('principal')
       if (config?.fichaAtivaId === ficha.id) {
         await db.configuracoes.put({ chave: 'principal', fichaAtivaId: null })
-        await db.programacoes.add(snapshotProgramacao(null, [], 'desativacao'))
+        await registrarProgramacao(null, 'desativacao')
       }
       await db.treinos.where('fichaId').equals(ficha.id!).delete()
       await db.fichas.delete(ficha.id!)

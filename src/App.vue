@@ -5,19 +5,22 @@ import { confirmation } from '@/composables/useConfirm'
 import { feedback } from '@/composables/useFeedback'
 import { useRoute } from 'vue-router'
 import TopBar from '@/components/layout/TopBar.vue'
+import { sequencia } from '@/services/sequencia'
 
 const route = useRoute()
 const { state } = confirmation
 let interval: ReturnType<typeof setInterval> | undefined
+let pararSequencia: (() => void) | undefined
 const visibility = () => feedback.pause('hidden', document.hidden)
 watch(() => route.path === '/onboarding', hidden => feedback.pause('no-surface', hidden), { immediate: true })
 watch(() => !!state.value.options, open => feedback.pause('confirmation', open), { flush: 'sync' })
 onMounted(() => {
+  pararSequencia = sequencia.iniciar()
   visibility()
   document.addEventListener('visibilitychange', visibility)
   interval = setInterval(feedback.tick, 50)
 })
-onBeforeUnmount(() => { clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
+onBeforeUnmount(() => { pararSequencia?.(); clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
 </script>
 
 <template>

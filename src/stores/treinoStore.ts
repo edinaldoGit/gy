@@ -4,6 +4,8 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { db, type Ficha, type Treino, type ExercicioCatalogo, type ExercicioRealizado, type HistoricoTreino } from '@/database/db'
 import { obterTreinoDoDia } from '@/utils/programacao'
+import { contextoConclusao } from '@/utils/diasLocais'
+import { sequencia } from '@/services/sequencia'
 
 export interface SerieExecucao {
   numero: number;
@@ -352,6 +354,7 @@ export const useTreinoStore = defineStore('treino', () => {
           duracaoMinutos: Math.max(0, ((Date.now() - new Date(atual.dataInicio || Date.now()).getTime()) / 60000))
         })
       })
+      void sequencia.recarregar()
       return true
     } catch (error) {
       mostrarFalhaPersistencia(error)
@@ -538,6 +541,8 @@ export const useTreinoStore = defineStore('treino', () => {
 
     try {
       const id = sessaoId.value
+      const concluidaEm = new Date()
+      let novaConclusao = false
       await db.transaction('rw', db.historico, async () => {
         const atual = await db.historico.get(id)
         if (!atual) throw new Error('A sessão não foi encontrada no banco local.')
@@ -546,10 +551,12 @@ export const useTreinoStore = defineStore('treino', () => {
 
         await db.historico.update(id, {
           ...criarRegistroSessao('finalizado'),
-          dataFim: new Date(),
+          dataFim: concluidaEm,
+          ...contextoConclusao(concluidaEm),
           duracaoMinutos: calcularSegundosDecorridos() / 60,
           estado: 'finalizado'
         })
+        novaConclusao = true
       })
 
       pararCronometro()
@@ -560,6 +567,10 @@ export const useTreinoStore = defineStore('treino', () => {
       estadoAtual.value = 'concluido'
       treinoFinalizadoHoje.value = true
       feedback.success('Treino concluído! Sessão salva no histórico.')
+      if (novaConclusao) {
+        const mensagem = await sequencia.aposConclusao(id)
+        if (mensagem) feedback.success(mensagem)
+      }
       return true
     } catch (error) {
       mostrarFalhaPersistencia(error)

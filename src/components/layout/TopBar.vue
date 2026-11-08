@@ -4,7 +4,8 @@ import { useRoute } from 'vue-router'
 import { db } from '@/database/db'
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
-import { Dumbbell, ClipboardList, History, User, ChevronDown, UserRound, Flame } from 'lucide-vue-next'
+import { Dumbbell, ClipboardList, History, User, ChevronDown, UserRound, Flame, Snowflake } from 'lucide-vue-next'
+import { sequencia } from '@/services/sequencia'
 
 import type { FeedbackMessage } from '@/utils/feedbackManager'
 import { feedbackThemes } from '@/theme/feedbackThemes'
@@ -29,7 +30,8 @@ const treinoStore = useTreinoStore()
 const { estadoAtual, cronometroFormatado } = storeToRefs(treinoStore)
 
 const isWorkoutActive = computed(() => estadoAtual.value === 'execucao')
-const streakDays = ref(3) // Pode conectar com o banco depois
+const streakDays = computed(() => sequencia.estado.value.quantidade)
+const fogoAtivo = computed(() => sequencia.estado.value.desbloqueada)
 // ------------------------------------
 
 const navItems = [
@@ -93,9 +95,10 @@ onMounted(async () => {
             <UserRound v-else :size="28" class="text-whitesmoke-50" />
           </div>
           
-          <div v-if="streakDays > 0" class="h-9 flex items-center pl-6 pr-4 -ml-5 rounded-r-full bg-whitesmoke-50 relative z-0 shadow-sm">
+          <div role="status" :aria-label="sequencia.erro.value ? 'Sequência indisponível. Tente reabrir o aplicativo.' : `Sequência de ${streakDays} dias programados: ${fogoAtivo ? 'fogo ativo' : 'congelada'}`" class="h-9 flex items-center pl-6 pr-4 -ml-5 rounded-r-full bg-whitesmoke-50 relative z-0 shadow-sm">
             <div class="flex items-center gap-1.5 translate-x-0.5">
-              <Flame :size="18" class="text-orange-400 drop-shadow-sm" fill="currentColor" stroke-width="1.5" />
+              <Flame v-if="fogoAtivo" :size="18" class="text-orange-400 drop-shadow-sm" fill="currentColor" stroke-width="1.5" aria-hidden="true" />
+              <Snowflake v-else :size="18" class="text-cerulean-500 drop-shadow-sm" stroke-width="1.5" aria-hidden="true" />
               <span 
                 class="text-sm font-black transition-colors duration-500"
                 :class="activeTabStyles.icon"
