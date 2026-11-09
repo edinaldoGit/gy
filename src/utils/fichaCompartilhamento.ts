@@ -1,11 +1,14 @@
 import type { ExercicioCatalogo, ExercicioNaFicha, Ficha, FichaCompleta, Treino, GyDB } from '@/database/db'
+import { comGravacaoGy } from '../database/writeLock.ts'
+import { identidadeDoCatalogo, identidadeOficial, identidadeValida } from './identidadeExercicio.ts'
 
 export const FORMATO_FICHAS = 'gy-training-program'
-export const VERSAO_FICHAS = 2
+export const VERSAO_FICHAS = 3
 export const TAMANHO_MAXIMO_ARQUIVO = 1_000_000
 
 export interface ExercicioTransferencia {
   ref: string
+  exercicioCanonicoId?: string
   nome: string
   grupoMuscular: string
   equipamento: string
@@ -84,15 +87,18 @@ export const validarDocumentoFichas = (entrada: unknown): DocumentoFichas => {
   const raiz = objeto(entrada, 'arquivo')
   chaves(raiz, ['formato', 'versao', 'exportadoEm', 'exercicios', 'fichas'], 'arquivo')
   if (raiz.formato !== FORMATO_FICHAS) throw new ErroCompartilhamento('Este arquivo não é uma exportação de fichas Gy compatível.')
-  if (raiz.versao !== VERSAO_FICHAS) throw new ErroCompartilhamento(`A versão ${String(raiz.versao)} deste arquivo não é compatível.`)
+  if (raiz.versao !== 2 && raiz.versao !== VERSAO_FICHAS) throw new ErroCompartilhamento(`A versão ${String(raiz.versao)} deste arquivo não é compatível.`)
   const exportadoEm = texto(raiz.exportadoEm, 'data de exportação', 40)
   if (!Number.isFinite(Date.parse(exportadoEm))) throw new ErroCompartilhamento('A data de exportação é inválida.')
   if (!Array.isArray(raiz.fichas) || !raiz.fichas.length || raiz.fichas.length > 50) throw new ErroCompartilhamento('O arquivo deve conter de 1 a 50 fichas.')
   if (!Array.isArray(raiz.exercicios) || !raiz.exercicios.length || raiz.exercicios.length > 500) throw new ErroCompartilhamento('A quantidade de exercícios no arquivo é inválida.')
   const exercicios = raiz.exercicios.map((v, i): ExercicioTransferencia => {
     const e = objeto(v, `exercício ${i + 1}`)
-    chaves(e, ['ref', 'nome', 'grupoMuscular', 'equipamento', 'videoUrl', 'seriesPadrao', 'repsPadrao'], 'exercício')
-    return { ref: texto(e.ref, 'referência do exercício', 40), nome: texto(e.nome, 'nome do exercício', 120), grupoMuscular: texto(e.grupoMuscular, 'grupo muscular', 80), equipamento: texto(e.equipamento, 'equipamento', 80, true), videoUrl: urlHttp(e.videoUrl), seriesPadrao: numero(e.seriesPadrao, 'séries padrão', 1, 50, true), repsPadrao: texto(e.repsPadrao, 'repetições padrão', 40) }
+    chaves(e, ['ref', 'exercicioCanonicoId', 'nome', 'grupoMuscular', 'equipamento', 'videoUrl', 'seriesPadrao', 'repsPadrao'], 'exercício')
+    if (e.exercicioCanonicoId !== undefined && !identidadeValida(e.exercicioCanonicoId)) throw new ErroCompartilhamento('A identidade do exercício é inválida.')
+    const registro = { exercicioCanonicoId: e.exercicioCanonicoId as string | undefined, ref: texto(e.ref, 'referência do exercício', 40), nome: texto(e.nome, 'nome do exercício', 120), grupoMuscular: texto(e.grupoMuscular, 'grupo muscular', 80), equipamento: texto(e.equipamento, 'equipamento', 80, true), videoUrl: urlHttp(e.videoUrl), seriesPadrao: numero(e.seriesPadrao, 'séries padrão', 1, 50, true), repsPadrao: texto(e.repsPadrao, 'repetições padrão', 40) }
+    if (registro.exercicioCanonicoId?.startsWith('gy:oficial:') && identidadeOficial(registro) !== registro.exercicioCanonicoId) throw new ErroCompartilhamento('A identidade oficial não corresponde ao exercício.')
+    return registro
   })
   const porRef = new Map(exercicios.map(e => [e.ref, e]))
   if (porRef.size !== exercicios.length) throw new ErroCompartilhamento('O arquivo contém referências de exercício duplicadas.')
@@ -145,7 +151,7 @@ export const criarDocumentoFichas = (fichas: FichaCompleta[], catalogo: Exercici
     const e = porId.get(id)
     if (!e) throw new ErroCompartilhamento('Não foi possível exportar: um exercício da ficha não existe mais no catálogo.')
     const ref = `ex-${refs.size + 1}`; refs.set(id, ref)
-    exercicios.push({ ref, nome: e.nome, grupoMuscular: e.grupoMuscular, equipamento: e.equipamento || '', videoUrl: e.videoUrl || '', seriesPadrao: e.defaultSeries, repsPadrao: e.defaultReps })
+    exercicios.push({ ref, exercicioCanonicoId: e.exercicioCanonicoId ?? identidadeOficial(e), nome: e.nome, grupoMuscular: e.grupoMuscular, equipamento: e.equipamento || '', videoUrl: e.videoUrl || '', seriesPadrao: e.defaultSeries, repsPadrao: e.defaultReps })
     return ref
   }
   const transferidas = fichas.map(f => ({
@@ -157,9 +163,13 @@ export const criarDocumentoFichas = (fichas: FichaCompleta[], catalogo: Exercici
 
 const identidade = (e: Pick<ExercicioTransferencia, 'nome'|'grupoMuscular'|'equipamento'|'videoUrl'>) => [e.nome,e.grupoMuscular,e.equipamento,e.videoUrl].map(v => (v || '').trim().toLocaleLowerCase('pt-BR').replace(/\s+/g,' ')).join('\u0000')
 export const resolverExercicios = (descritores: ExercicioTransferencia[], catalogo: ExercicioCatalogo[]) => {
-  const existentes = new Map<string, ExercicioCatalogo>()
-  for (const e of catalogo) if (!existentes.has(identidade(e))) existentes.set(identidade(e), e)
-  return new Map(descritores.map(e => [e.ref, existentes.get(identidade(e)) ?? null]))
+  return new Map(descritores.map(e => {
+    const canonica = e.exercicioCanonicoId ?? identidadeOficial(e)
+    const mesmaIdentidade = canonica ? catalogo.find(c => (c.exercicioCanonicoId ?? identidadeOficial(c)) === canonica) : undefined
+    if (mesmaIdentidade && identidade(mesmaIdentidade) !== identidade(e)) throw new ErroCompartilhamento('Uma identidade de exercício aponta para descrições diferentes.')
+    const existente = mesmaIdentidade ?? (!canonica ? catalogo.find(c => identidade(c) === identidade(e)) : undefined)
+    return [e.ref, existente ?? null]
+  }))
 }
 export const nomeArquivoSeguro = (nomes: string[], multiplo = nomes.length > 1) => {
   const base = multiplo ? 'gy-programas' : `gy-ficha-${nomes[0] || 'treino'}`
@@ -172,14 +182,15 @@ export interface ResultadoImportacao { fichasCriadas: number; treinosCriados: nu
 export const persistirDocumentoFichas = async (entrada: DocumentoFichas, banco: Pick<GyDB, 'catalogo'|'fichas'|'treinos'|'transaction'>): Promise<ResultadoImportacao> => {
   const doc = validarDocumentoFichas(entrada)
   let exerciciosCriados = 0, treinosCriados = 0
-  await banco.transaction('rw', banco.catalogo, banco.fichas, banco.treinos, async () => {
+  await comGravacaoGy(() => banco.transaction('rw', banco.catalogo, banco.fichas, banco.treinos, async () => {
     const catalogo = await banco.catalogo.toArray()
     const resolvidos = resolverExercicios(doc.exercicios, catalogo)
     const ids = new Map<string, number>()
     for (const e of doc.exercicios) {
       const atual = resolvidos.get(e.ref)
       if (atual?.id != null) { ids.set(e.ref, atual.id); continue }
-      const id = await banco.catalogo.add({ nome: e.nome, grupoMuscular: e.grupoMuscular, equipamento: e.equipamento, videoUrl: e.videoUrl, defaultSeries: e.seriesPadrao, defaultReps: e.repsPadrao })
+      const identidadeCanonica = e.exercicioCanonicoId ?? identidadeDoCatalogo({ nome: e.nome, grupoMuscular: e.grupoMuscular, equipamento: e.equipamento, videoUrl: e.videoUrl, defaultSeries: e.seriesPadrao, defaultReps: e.repsPadrao })
+      const id = await banco.catalogo.add({ exercicioCanonicoId: identidadeCanonica, nome: e.nome, grupoMuscular: e.grupoMuscular, equipamento: e.equipamento, videoUrl: e.videoUrl, defaultSeries: e.seriesPadrao, defaultReps: e.repsPadrao })
       ids.set(e.ref, id); catalogo.push({ ...e, id } as unknown as ExercicioCatalogo); exerciciosCriados++
     }
     for (const f of doc.fichas) {
@@ -196,6 +207,6 @@ export const persistirDocumentoFichas = async (entrada: DocumentoFichas, banco: 
         treinosCriados++
       }
     }
-  })
+  }))
   return { fichasCriadas: doc.fichas.length, treinosCriados, exerciciosCriados }
 }

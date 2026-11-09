@@ -75,6 +75,7 @@ const cargaFormatada = (peso: number | string | undefined) => {
               <div class="min-w-0">
                 <p class="text-[10px] font-bold uppercase tracking-widest text-teal-600">Exercício {{ ordemDoExercicio(exercicio.ordem, index) }}</p>
                 <h4 class="mt-0.5 break-words font-bold text-whitesmoke-950">{{ exercicio.nome || 'Exercício salvo' }}</h4>
+                <p v-if="exercicio.planejado && exercicio.planejado.exercicioId !== exercicio.exercicioId" class="mt-1 break-words text-xs text-teal-600">Substituiu: {{ exercicio.planejado.nome }}</p>
                 <p v-if="exercicio.grupoMuscular" class="mt-0.5 text-xs text-whitesmoke-500">{{ exercicio.grupoMuscular }}</p>
               </div>
               <span v-if="exercicio.seriesPlanejadas != null" class="shrink-0 rounded-full bg-whitesmoke-100 px-2.5 py-1 text-[10px] font-semibold text-whitesmoke-600">

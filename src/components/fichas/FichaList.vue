@@ -121,8 +121,13 @@ const excluir = async (ficha: FichaCompleta) => {
 
   <div v-else class="flex flex-col gap-5 animate-in slide-in-from-left-4 pb-12">
     <SectionPageHeader titulo="Minhas Fichas" subtitulo="Organize seus programas de treino." tema="fichas">
-      <template #acoes><FichasCompartilhamento compact /><button type="button" aria-label="Criar ficha" title="Criar ficha" class="flex h-11 w-11 items-center justify-center rounded-full bg-white text-cerulean-600 shadow-sm hover:bg-cerulean-50" @click="store.abrirNovaFicha"><CirclePlus :size="19" /></button></template>
+      <template #acoes><FichasCompartilhamento compact /></template>
     </SectionPageHeader>
+
+    <button type="button" class="flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl bg-cerulean-600 px-5 py-4 text-sm font-bold text-white shadow-md shadow-cerulean-600/20 transition hover:bg-cerulean-700 active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cerulean-600" @click="store.abrirNovaFicha">
+      <CirclePlus :size="22" class="shrink-0" aria-hidden="true" />
+      Criar nova ficha
+    </button>
 
     <section aria-labelledby="ficha-atual-heading" class="flex flex-col gap-3">
       <h2 id="ficha-atual-heading" class="px-2 text-xs font-bold uppercase tracking-widest text-whitesmoke-500">Ficha atual</h2>

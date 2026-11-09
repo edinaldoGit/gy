@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { db } from '@/database/db'
+import { comGravacaoGy } from '@/database/writeLock'
 
 export const useOnboardingStore = defineStore('onboarding', () => {
   const showSplash = ref(true)
@@ -61,14 +62,14 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   const salvarPerfil = async () => {
     if (!form.value.nome || !form.value.idade || !form.value.peso || !form.value.altura) return false
 
-    await db.perfil.add({
+    await comGravacaoGy(() => db.perfil.add({
       nome: form.value.nome,
       idade: Number(form.value.idade),
       peso: Number(form.value.peso),
       altura: Number(form.value.altura),
       fotoPerfil: form.value.fotoPerfil || undefined,
       criadoEm: new Date()
-    })
+    }))
     return true
   }
 

@@ -2,8 +2,9 @@
 import { ref, computed } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useFichaStore } from '@/stores/fichaStore'
-import { Search, Plus, Check, ChevronRight, Dumbbell, Shield, Activity, Zap, Heart, Flame, Compass, Target } from 'lucide-vue-next'
+import { Search, Plus, ChevronRight, Dumbbell, Shield, Activity, Zap, Heart, Flame, Compass, Target } from 'lucide-vue-next'
 import FichaWizardHeader from './FichaWizardHeader.vue'
+import ExercicioSelecaoCard from './ExercicioSelecaoCard.vue'
 
 const store = useFichaStore()
 const { modo, termoBusca, fichaEditando, treinoEditando, resultadosBusca, exerciciosAgrupados, modalCriarExAberto } = storeToRefs(store)
@@ -141,23 +142,16 @@ const abrirCategoria = (grupo: string) => {
     <div class="px-4 pb-6">
       
       <div v-if="termoBusca" class="flex flex-col gap-3 animate-in fade-in">
-        <div class="grid grid-cols-2 gap-3">
-          <div 
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <ExercicioSelecaoCard
             v-for="ex in resultadosBusca" :key="ex.id"
-            @click="toggleExercicio(ex)"
-            class="bg-white p-3 rounded-[1.25rem] border-2 transition-all cursor-pointer select-none flex flex-col justify-between h-24 relative overflow-hidden shadow-sm"
-            :class="isExercicioSelecionado(ex.id!) ? [classesSelecao.border, classesSelecao.bg] : 'border-whitesmoke-200 hover:border-whitesmoke-300'"
-          >
-            <div class="absolute right-3 top-3 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors z-10" :class="isExercicioSelecionado(ex.id!) ? [classesSelecao.text, 'border-transparent'] : 'border-whitesmoke-200 text-transparent bg-white'">
-              <Check :size="12" stroke-width="3" />
-            </div>
-            
-            <h4 class="text-[11px] font-bold text-whitesmoke-950 line-clamp-2 leading-tight pr-6 relative z-10">{{ ex.nome }}</h4>
-            <div class="flex items-center gap-1.5 mt-2">
-              <span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md text-white" :class="temaAtual.bg">{{ ex.grupoMuscular }}</span>
-              <span class="text-[9px] font-bold text-whitesmoke-400 border border-whitesmoke-200 px-1.5 py-0.5 rounded-md">{{ ex.equipamento }}</span>
-            </div>
-          </div>
+            :exercicio="ex"
+            :selecionado="isExercicioSelecionado(ex.id!)"
+            :imagem="imagensGrupos[ex.grupoMuscular]"
+            :cor="classesSelecao.hex"
+            :classes-selecao="classesSelecao"
+            @selecionar="toggleExercicio(ex)"
+          />
         </div>
       </div>
 
@@ -211,22 +205,16 @@ const abrirCategoria = (grupo: string) => {
           </button>
         </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div 
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <ExercicioSelecaoCard
             v-for="ex in exerciciosFiltrados" :key="ex.id"
-            @click="toggleExercicio(ex)"
-            class="bg-white p-3 rounded-[1.25rem] border-2 transition-all cursor-pointer select-none flex flex-col justify-between h-24 relative overflow-hidden shadow-sm"
-            :class="isExercicioSelecionado(ex.id!) ? [classesSelecao.border, classesSelecao.bg] : 'border-whitesmoke-200 hover:border-whitesmoke-300'"
-          >
-            <div class="absolute right-3 top-3 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors z-10" :class="isExercicioSelecionado(ex.id!) ? [classesSelecao.text, 'border-transparent'] : 'border-whitesmoke-200 text-transparent bg-white'">
-              <Check :size="12" stroke-width="3" />
-            </div>
-            
-            <h4 class="text-[11px] font-bold text-whitesmoke-950 line-clamp-2 leading-tight pr-6 relative z-10">{{ ex.nome }}</h4>
-            <div class="flex items-center mt-2 relative z-10">
-              <span class="text-[9px] font-bold text-whitesmoke-500 bg-whitesmoke-100 px-2 py-0.5 rounded-md border border-whitesmoke-200">{{ ex.equipamento }}</span>
-            </div>
-          </div>
+            :exercicio="ex"
+            :selecionado="isExercicioSelecionado(ex.id!)"
+            :imagem="imagensGrupos[ex.grupoMuscular]"
+            :cor="classesSelecao.hex"
+            :classes-selecao="classesSelecao"
+            @selecionar="toggleExercicio(ex)"
+          />
         </div>
 
         <div v-if="exerciciosFiltrados.length === 0" class="flex flex-col items-center justify-center py-10 opacity-60">
@@ -241,7 +229,7 @@ const abrirCategoria = (grupo: string) => {
       <button 
         @click="modo = 'step3'"
         :disabled="!treinoEditando.nome.trim() || (treinoEditando.exercicios?.length || 0) === 0"
-        class="flex w-full items-center justify-between rounded-[1.25rem] bg-cerulean-500 px-6 py-4 text-sm font-black text-white shadow-xl shadow-cerulean-500/30 transition-all hover:bg-cerulean-600 active:scale-[0.98] disabled:active:scale-100 disabled:opacity-50"
+        class="flex w-full items-center justify-between rounded-[1.25rem] bg-cerulean-500 px-6 py-4 text-sm font-black text-white transition-all hover:bg-cerulean-600 active:scale-[0.98] disabled:active:scale-100 disabled:opacity-50"
       >
         <span>{{ treinoEditando.exercicios?.length }} EXERCÍCIOS</span>
         <div class="flex items-center gap-2">AJUSTAR SÉRIES <ChevronRight :size="18"/></div>

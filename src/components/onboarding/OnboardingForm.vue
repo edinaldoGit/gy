@@ -13,7 +13,7 @@ const triggerFileInput = () => {
   document.getElementById('fotoUpload')?.click()
 }
 
-const emit = defineEmits(['concluido'])
+const emit = defineEmits(['concluido', 'restaurar'])
 
 const processando = ref(false)
 const erro = ref('')
@@ -125,5 +125,6 @@ const submeter = async () => {
         <ArrowRight :size="20" class="ml-2" />
       </button>
     </form>
+    <button type="button" class="mt-4 w-full py-2 text-sm font-bold text-amethyst-600 underline-offset-4 hover:underline" @click="emit('restaurar')">Já tenho um backup para restaurar</button>
   </div>
 </template>

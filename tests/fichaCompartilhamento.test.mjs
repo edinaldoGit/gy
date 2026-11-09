@@ -48,7 +48,7 @@ test('exporta fichas completas, mantém treino em dois dias e omite IDs e dados 
   const doc = documento(programaA, programaB)
   const json = JSON.stringify(doc)
   assert.equal(doc.formato, FORMATO_FICHAS)
-  assert.equal(doc.versao, 2)
+  assert.equal(doc.versao, 3)
   assert.equal(doc.fichas[0].treinos[0].corTema, 'orange')
   assert.equal(doc.fichas.length, 2)
   assert.equal(doc.fichas[0].treinos.length, 3)

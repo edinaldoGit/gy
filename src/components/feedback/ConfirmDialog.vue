@@ -34,7 +34,7 @@ onBeforeUnmount(() => { confirmation.cancel() })
 <template>
   <Transition name="confirm" :duration="{ enter: 400, leave: 280 }">
     <div v-if="state.options" class="absolute inset-0 z-[200] flex items-end justify-center overflow-y-auto bg-whitesmoke-950/25 backdrop-blur-sm sm:items-center sm:p-6" @keydown="keyboard">
-      <section ref="panel" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description" :aria-busy="state.busy" tabindex="-1" class="max-h-full w-full overflow-y-auto rounded-t-[2.5rem] bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl outline-none sm:max-w-md sm:rounded-[2rem]">
+      <section ref="panel" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description" :aria-busy="state.busy" tabindex="-1" class="gy-modal-height w-full overflow-y-auto rounded-t-[2.5rem] bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl outline-none sm:max-w-md sm:rounded-[2rem]">
         <span class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl" :class="tones[state.options.variant || 'info'].icon"><component :is="icons[state.options.icon || 'warning']" :size="27" /></span>
         <h2 id="confirm-title" class="text-center text-xl font-black text-whitesmoke-950">{{ state.options.title }}</h2>
         <p id="confirm-description" class="mt-3 text-center text-sm leading-relaxed text-whitesmoke-600">{{ state.options.message }}</p>

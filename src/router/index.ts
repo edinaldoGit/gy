@@ -35,7 +35,7 @@ export const router = createRouter({
 })
 
 router.beforeEach(async (to, _from, next) => {
-  if (to.path === '/onboarding') {
+  if (to.path === '/onboarding' || to.path === '/perfil') {
     next()
     return
   }

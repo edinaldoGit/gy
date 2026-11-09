@@ -101,6 +101,10 @@
 }
 
 
+.gy-modal-height {
+  max-height: min(85dvh, max(0px, calc(100cqh - 2rem)));
+}
+
 .gy-modal-enter-active, .gy-modal-leave-active {
   transition: opacity 280ms ease;
 }

@@ -3,6 +3,7 @@ import { shallowRef } from 'vue'
 import { db } from '@/database/db'
 import { snapshotProgramacao } from '@/utils/programacao'
 import { calcularSequencia, EstadoSequencia, feedbackDaSequencia } from '@/utils/sequencia'
+import { comGravacaoGy } from '@/database/writeLock'
 
 const dominio = new EstadoSequencia()
 const estado = shallowRef(dominio.recalcular())
@@ -21,7 +22,7 @@ const recarregar = async () => {
   try { aplicar(await ler()) } catch { erro.value = true }
 }
 const registrarInicio = async () => {
-  await db.transaction('rw', db.programacoes, db.configuracoes, db.fichas, db.treinos, async () => {
+  await comGravacaoGy(() => db.transaction('rw', db.programacoes, db.configuracoes, db.fichas, db.treinos, async () => {
     if (await db.programacoes.count()) return
     const config = await db.configuracoes.get('principal')
     if (config?.fichaAtivaId == null) return
@@ -29,7 +30,7 @@ const registrarInicio = async () => {
     if (!ficha) return
     const treinos = await db.treinos.where('fichaId').equals(ficha.id!).toArray()
     await db.programacoes.add(snapshotProgramacao(ficha, treinos, 'ativacao'))
-  })
+  }))
 }
 let parar: (() => void) | undefined
 const iniciar = () => {

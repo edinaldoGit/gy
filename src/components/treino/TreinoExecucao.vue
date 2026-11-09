@@ -5,6 +5,9 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
 import { CheckCircle2, ChevronDown, CheckCheck, RotateCcw, Check, Play, WifiOff, Timer } from 'lucide-vue-next'
+import { ArrowLeftRight } from 'lucide-vue-next'
+import SubstituirExercicio from './SubstituirExercicio.vue'
+import { temRegistros, type ExercicioExecucao } from '@/utils/exercicioSessao'
 
 const store = useTreinoStore()
 const {
@@ -14,6 +17,9 @@ const {
 } = storeToRefs(store)
 
 const temConexao = ref(navigator.onLine)
+const slotSubstituicao = ref<string | null>(null)
+const anterior = (ex: ExercicioExecucao) => ex.exercicioCanonicoId ? store.ultimasExecucoes.get(ex.exercicioCanonicoId) : null
+const dataAnterior = (data: Date) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' }).format(data)
 const atualizarStatusConexao = () => { temConexao.value = navigator.onLine }
 
 onMounted(() => {
@@ -47,10 +53,11 @@ onUnmounted(() => {
       <p v-else aria-live="polite" class="text-[10px] font-medium text-whitesmoke-400">
         {{ estadoPersistencia === 'salvando' ? 'Salvando alterações…' : 'Sessão salva automaticamente' }}
       </p>
+      <div v-if="store.erroHistorico" role="alert" class="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{{ store.erroHistorico }} <button type="button" class="font-bold underline" @click="store.carregarReferencias">Tentar novamente</button></div>
     </div>
 
     <!-- Camada sob o painel de foco; o z-10 mantém o desfoque abaixo dele. -->
-    <div class="flex flex-col gap-3 relative z-10">
+    <div class="flex flex-col gap-3 relative z-10" :inert="!!slotSubstituicao || store.substituindo">
       <div
         v-for="(ex, index) in exerciciosExecucao" :key="ex.idUnico"
         class="bg-white rounded-[1.5rem] shadow-sm border transition-all duration-500 overflow-hidden"
@@ -68,6 +75,7 @@ onUnmounted(() => {
           <div class="flex-1 min-w-0">
             <h4 class="text-base font-bold text-whitesmoke-950 truncate" :class="{'line-through text-whitesmoke-400': ex.concluido}">{{ ex.nome }}</h4>
             <p class="text-xs font-medium text-whitesmoke-400 mt-0.5">{{ ex.seriesTotais }}x {{ ex.repsAlvo }} reps</p>
+            <p v-if="ex.planejado && ex.planejado.exercicioId !== ex.exercicioId" class="mt-1 break-words text-[11px] font-medium text-amethyst-600">Substituindo: {{ ex.planejado.nome }}</p>
           </div>
           <ChevronDown :size="20" class="text-whitesmoke-400 transition-transform duration-300" :class="{'rotate-180': exercicioExpandido === ex.idUnico}" />
         </div>
@@ -75,6 +83,14 @@ onUnmounted(() => {
         <div class="grid transition-all duration-500 ease-in-out" :class="exercicioExpandido === ex.idUnico ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'">
           <div class="overflow-hidden">
             <div class="p-4 pt-0 border-t border-whitesmoke-100 mt-2 flex flex-col gap-4">
+
+              <div class="mt-3 space-y-2">
+                <div class="flex flex-wrap gap-2">
+                  <button type="button" :disabled="temRegistros(ex)" class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-amethyst-50 px-3 text-xs font-bold text-amethyst-600 disabled:opacity-50" @click="slotSubstituicao = ex.idUnico"><ArrowLeftRight :size="16" />Substituir exercício</button>
+                  <button v-if="ex.planejado && ex.planejado.exercicioId !== ex.exercicioId" type="button" :disabled="temRegistros(ex)" class="min-h-10 rounded-xl bg-whitesmoke-100 px-3 text-xs font-bold text-whitesmoke-600 disabled:opacity-50" @click="store.substituirExercicio(ex.idUnico)">Voltar ao original</button>
+                </div>
+                <p v-if="temRegistros(ex)" class="text-[11px] leading-relaxed text-whitesmoke-500">A substituição fica bloqueada após editar cargas, repetições ou registrar séries, para preservar seus dados.</p>
+              </div>
 
               <div @click.stop="store.abrirVideo(ex.nome, ex.videoUrl)" class="mt-3 relative w-full h-20 rounded-2xl overflow-hidden bg-whitesmoke-100 border border-whitesmoke-200 cursor-pointer group shadow-sm flex items-center justify-between px-4 hover:border-whitesmoke-300 transition-colors">
                 <div class="flex items-center gap-3">
@@ -87,6 +103,20 @@ onUnmounted(() => {
                   </div>
                 </div>
                 <span class="text-[10px] font-bold uppercase tracking-wider text-cerulean-600 bg-cerulean-50 px-2.5 py-1 rounded-lg border border-cerulean-100">Ver Vídeo</span>
+              </div>
+
+              <div class="rounded-2xl border border-amethyst-100 bg-amethyst-50/40 p-3">
+                <p class="text-xs font-bold text-amethyst-600">Última execução deste exercício</p>
+                <p v-if="store.historicoCarregando" class="mt-2 text-xs text-whitesmoke-500">Consultando histórico…</p>
+                <template v-else-if="anterior(ex)">
+                  <p class="mt-1 break-words text-[11px] text-whitesmoke-500">{{ dataAnterior(anterior(ex)!.data) }} · {{ anterior(ex)!.treinoNome }} · {{ anterior(ex)!.fichaNome }}</p>
+                  <dl class="mt-3 space-y-1.5 text-xs">
+                    <div v-for="serie in anterior(ex)!.series" :key="serie.numeroDaSerie" class="flex items-center justify-between gap-3"><dt class="font-semibold text-whitesmoke-600">Série {{ serie.numeroDaSerie }}</dt><dd class="text-right font-bold text-whitesmoke-800">{{ serie.peso }} kg · {{ serie.reps }} reps</dd></div>
+                  </dl>
+                  <button type="button" :disabled="temRegistros(ex)" class="mt-3 min-h-10 rounded-xl bg-white px-3 text-xs font-bold text-amethyst-600 disabled:opacity-50" @click="store.usarUltimasCargas(ex.idUnico)">Usar últimas cargas e repetições</button>
+                  <p class="mt-1 text-[10px] leading-relaxed text-whitesmoke-500">Referência apenas. Você continua confirmando cada série.</p>
+                </template>
+                <p v-else-if="!store.erroHistorico" class="mt-2 text-xs text-whitesmoke-500">Ainda não há séries concluídas para este exercício.</p>
               </div>
 
               <div>
@@ -117,7 +147,7 @@ onUnmounted(() => {
                     </div>
 
                     <div class="flex min-w-0 justify-center">
-                      <input type="text" :aria-label="`Repetições da série ${serie.numero} de ${ex.nome}`" v-model="serie.repsFeitas" :disabled="serie.finalizada" class="w-full min-w-0 max-w-16 bg-whitesmoke-100 text-center font-semibold text-whitesmoke-950 py-2 rounded-xl border border-transparent outline-none disabled:opacity-50" />
+                      <input type="text" :aria-label="`Repetições da série ${serie.numero} de ${ex.nome}`" v-model="serie.repsFeitas" @input="store.marcarEdicao(ex.idUnico)" :disabled="serie.finalizada" class="w-full min-w-0 max-w-16 bg-whitesmoke-100 text-center font-semibold text-whitesmoke-950 py-2 rounded-xl border border-transparent outline-none disabled:opacity-50" />
                     </div>
 
                     <div class="w-12 flex justify-center">
@@ -128,6 +158,7 @@ onUnmounted(() => {
                     </div>
                   </div>
                 </div>
+                <label class="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-whitesmoke-500">Descanso entre séries (segundos)<input v-model.number="ex.descansoSegundos" type="number" min="0" max="3600" :aria-label="`Descanso de ${ex.nome} em segundos`" class="min-h-10 w-20 rounded-xl bg-whitesmoke-100 px-3 text-center text-whitesmoke-800" /></label>
               </div>
 
             </div>
@@ -138,11 +169,14 @@ onUnmounted(() => {
 
     <button
       :aria-busy="store.finalizando" @click="store.finalizarTreino"
+      :inert="!!slotSubstituicao || store.substituindo"
       :disabled="store.finalizando || progressoTreino.concluidos < progressoTreino.total"
       class="relative z-10 mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-amethyst-500 py-4 text-sm font-black text-white transition-all hover:bg-amethyst-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 disabled:opacity-40"
     >
       {{ progressoTreino.concluidos < progressoTreino.total ? `CONCLUA TODOS OS EXERCÍCIOS (${progressoTreino.concluidos}/${progressoTreino.total})` : 'FINALIZAR TREINO HOJE' }}
     </button>
+
+    <Transition name="gy-modal" :duration="{ enter: 420, leave: 280 }"><SubstituirExercicio v-if="slotSubstituicao" :slot-id="slotSubstituicao" @fechar="slotSubstituicao = null" /></Transition>
 
 
     <!-- z-40 mantém o painel e o desfoque abaixo da TopBar (z-100). -->

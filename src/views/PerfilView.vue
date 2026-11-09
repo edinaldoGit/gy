@@ -6,15 +6,16 @@ import { useRouter } from 'vue-router'
 import { db, type Perfil } from '@/database/db'
 import { UserRound, Ruler, Weight, CalendarDays, Activity, Trash2 } from 'lucide-vue-next'
 import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
+import BackupDados from '@/components/perfil/BackupDados.vue'
+import { comGravacaoGy } from '@/database/writeLock'
 
 const router = useRouter()
 const usuario = ref<Perfil | null>(null)
+const carregandoPerfil = ref(true)
 
 onMounted(async () => {
-  const perfil = await db.perfil.toCollection().first()
-  if (perfil) {
-    usuario.value = perfil
-  }
+  try { usuario.value = await db.perfil.toCollection().first() ?? null }
+  finally { carregandoPerfil.value = false }
 })
 
 const imc = computed(() => {
@@ -38,7 +39,7 @@ const apagarDados = async () => {
     message: 'Seu nome, foto, idade, peso e altura serão removidos deste dispositivo. Essa ação não poderá ser desfeita.',
     details: 'Fichas, treinos e histórico permanecerão armazenados. Você voltará ao cadastro inicial.',
     variant: 'error', icon: 'trash', cancelText: 'Manter perfil', confirmText: 'Excluir perfil',
-    action: () => db.perfil.clear()
+    action: () => comGravacaoGy(() => db.perfil.clear())
   })
   if (confirmado) { feedback.success('Dados de perfil excluídos.'); await router.push('/onboarding') }
 }
@@ -116,6 +117,8 @@ const apagarDados = async () => {
       </div>
     </div>
 
+    <BackupDados />
+
     <div class="mt-4">
       <button 
         @click="apagarDados"
@@ -131,7 +134,13 @@ const apagarDados = async () => {
 
   </div>
   
-  <div v-else class="flex flex-col items-center justify-center h-64">
+  <div v-else-if="carregandoPerfil" class="flex flex-col items-center justify-center h-64">
     <div class="w-8 h-8 border-4 border-whitesmoke-200 border-t-bubblegum-500 rounded-full animate-spin"></div>
+  </div>
+  <div v-else class="flex flex-col gap-5 pb-20 animate-in fade-in duration-500">
+    <SectionPageHeader titulo="Meu Perfil" subtitulo="Restaure seus dados ou configure o Gy" tema="perfil" />
+    <p class="px-2 text-sm leading-relaxed text-whitesmoke-600">Você pode restaurar um backup de outro dispositivo ou concluir o cadastro para começar a usar o Gy.</p>
+    <BackupDados />
+    <button type="button" class="min-h-11 rounded-2xl border border-whitesmoke-200 bg-white px-4 text-sm font-bold text-whitesmoke-700" @click="router.push('/onboarding')">Ir para o cadastro</button>
   </div>
 </template>

@@ -12,6 +12,7 @@ export interface Perfil {
 
 export interface ExercicioCatalogo {
   id?: number;
+  exercicioCanonicoId?: string;
   nome: string;
   grupoMuscular: string;
   equipamento: string;
@@ -101,6 +102,9 @@ export interface HistoricoTreino {
 
 export interface ExercicioRealizado {
   exercicioId: number;
+  exercicioCanonicoId?: string;
+  planejado?: ExercicioPlanejadoSnapshot;
+  registrosEditados?: boolean;
   nome: string;
   grupoMuscular: string;
   videoUrl?: string;
@@ -112,6 +116,16 @@ export interface ExercicioRealizado {
   temDescanso: boolean;
   descansoSegundos: number;
   seriesRealizadas: SerieRealizada[];
+}
+
+export interface ExercicioPlanejadoSnapshot {
+  exercicioId: number;
+  exercicioCanonicoId?: string;
+  nome: string;
+  grupoMuscular: string;
+  videoUrl?: string;
+  pesoBasePlanejado?: number;
+  taxaAumentoKg?: number;
 }
 
 export interface SerieRealizada {

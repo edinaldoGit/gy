@@ -6,31 +6,40 @@ import { feedback } from '@/composables/useFeedback'
 import { useRoute } from 'vue-router'
 import TopBar from '@/components/layout/TopBar.vue'
 import { sequencia } from '@/services/sequencia'
+import { iniciarCoordenacaoBackup, restauracaoBloqueada } from '@/services/backupCoordinator'
+import { useTreinoStore } from '@/stores/treinoStore'
 
 const route = useRoute()
 const { state } = confirmation
 let interval: ReturnType<typeof setInterval> | undefined
 let pararSequencia: (() => void) | undefined
+let pararCoordenacaoBackup: (() => void) | undefined
+const treino = useTreinoStore()
 const visibility = () => feedback.pause('hidden', document.hidden)
 watch(() => route.path === '/onboarding', hidden => feedback.pause('no-surface', hidden), { immediate: true })
 watch(() => !!state.value.options, open => feedback.pause('confirmation', open), { flush: 'sync' })
 onMounted(() => {
   pararSequencia = sequencia.iniciar()
+  pararCoordenacaoBackup = iniciarCoordenacaoBackup(async () => {
+    if (state.value.busy) throw new Error('Outra confirmação está em andamento nesta aba.')
+    if (state.value.options) confirmation.cancel()
+    await treino.pausarParaBackup()
+  }, treino.retomarAposBackup)
   visibility()
   document.addEventListener('visibilitychange', visibility)
   interval = setInterval(feedback.tick, 50)
 })
-onBeforeUnmount(() => { pararSequencia?.(); clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
+onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
 </script>
 
 <template>
   <div class="flex h-dvh flex-col overflow-hidden bg-whitesmoke-50">
     
-    <div v-if="route.path !== '/onboarding'" class="relative z-[100] shrink-0" :inert="!!state.options"><TopBar /></div>
+    <div v-if="route.path !== '/onboarding'" class="relative z-[100] shrink-0" :inert="!!state.options || restauracaoBloqueada"><TopBar /></div>
 
-    <div class="relative isolate z-0 min-h-0 flex-1">
+    <div class="relative isolate z-0 min-h-0 flex-1 [container-type:size]">
 
-    <main tabindex="-1" :inert="!!state.options" class="h-full min-h-0 overflow-y-auto px-4 pb-4" :class="{ '!overflow-hidden': !!state.options }">
+    <main tabindex="-1" :inert="!!state.options || restauracaoBloqueada" class="h-full min-h-0 overflow-y-auto px-4 pb-4" :class="{ '!overflow-hidden': !!state.options }">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />

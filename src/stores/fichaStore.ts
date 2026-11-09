@@ -3,6 +3,9 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { db, type ConfiguracaoApp, type ExercicioCatalogo, type Ficha, type FichaCompleta, type Treino } from '@/database/db'
 import { conflitoDeDia, snapshotProgramacao } from '@/utils/programacao'
+import { comGravacaoGy } from '@/database/writeLock'
+import { novaIdentidadePersonalizada } from '@/utils/identidadeExercicio'
+import { filtrarCatalogo } from '@/utils/catalogo'
 
 type ModoFicha = 'lista' | 'detalhe' | 'step1' | 'treino-info' | 'step2' | 'step3'
 type ContextoWizard = 'nova-ficha' | 'editar-ficha' | 'novo-treino' | 'editar-treino'
@@ -47,8 +50,7 @@ export const useFichaStore = defineStore('ficha', () => {
     return grupos
   })
   const resultadosBusca = computed(() => {
-    const termo = termoBusca.value.toLowerCase()
-    return catalogo.value.filter(ex => ex.nome.toLowerCase().includes(termo) || ex.grupoMuscular.toLowerCase().includes(termo))
+    return filtrarCatalogo(catalogo.value, termoBusca.value)
   })
   const isExercicioSelecionado = (id: number) => treinoEditando.value.exercicios.some(ex => ex.exercicioId === id)
 
@@ -103,13 +105,13 @@ export const useFichaStore = defineStore('ficha', () => {
       descricao: fichaEditando.value.descricao?.trim() || '', corTema: fichaEditando.value.corTema || 'cerulean',
       origem: fichaEditando.value.origem || 'local', criadoEm: existente?.criadoEm || fichaEditando.value.criadoEm || agora, atualizadoEm: agora
     }
-    await db.transaction('rw', db.fichas, db.configuracoes, db.treinos, db.programacoes, async () => {
+    await comGravacaoGy(() => db.transaction('rw', db.fichas, db.configuracoes, db.treinos, db.programacoes, async () => {
       ficha.id = await db.fichas.put(ficha)
       if (existente) {
         const config = await db.configuracoes.get('principal')
         if (config?.fichaAtivaId === ficha.id) await registrarProgramacao(ficha.id, 'edicao')
       }
-    })
+    }))
     fichaEditando.value.id = ficha.id
     await carregarDados()
     feedback.success(existente ? 'Ficha atualizada com sucesso!' : 'Ficha criada com sucesso!')
@@ -175,10 +177,10 @@ export const useFichaStore = defineStore('ficha', () => {
       })),
       criadoEm: anterior?.criadoEm || agora, atualizadoEm: agora
     }
-    await db.transaction('rw', db.treinos, db.configuracoes, db.fichas, db.programacoes, async () => {
+    await comGravacaoGy(() => db.transaction('rw', db.treinos, db.configuracoes, db.fichas, db.programacoes, async () => {
       await db.treinos.put(treino)
       if ((await db.configuracoes.get('principal'))?.fichaAtivaId === fichaId) await registrarProgramacao(fichaId, 'edicao')
-    })
+    }))
     await carregarDados()
     fichaSelecionada.value = fichaAtivaLocalizada()
     modo.value = 'detalhe'
@@ -197,7 +199,7 @@ export const useFichaStore = defineStore('ficha', () => {
     if (!ficha) return { ok: false as const, sessaoAtiva: false as const }
     if ((await db.treinos.where('fichaId').equals(id).count()) === 0) return { ok: false as const, sessaoAtiva: false as const }
     let sessaoAtiva = false
-    await db.transaction('rw', db.configuracoes, db.programacoes, db.historico, db.fichas, db.treinos, async () => {
+    await comGravacaoGy(() => db.transaction('rw', db.configuracoes, db.programacoes, db.historico, db.fichas, db.treinos, async () => {
       // A sessão e a troca disputam o mesmo escopo transacional do histórico.
       const sessao = await db.historico.where('estado').equals('em_andamento').first()
       if (sessao) { sessaoAtiva = true; return }
@@ -206,7 +208,7 @@ export const useFichaStore = defineStore('ficha', () => {
       const config: ConfiguracaoApp = { chave: 'principal', fichaAtivaId: id }
       await db.configuracoes.put(config)
       await registrarProgramacao(id, anterior?.fichaAtivaId == null ? 'ativacao' : 'troca')
-    })
+    }))
     if (sessaoAtiva) return { ok: false as const, sessaoAtiva: true as const }
     await carregarDados()
     return { ok: true as const, sessaoAtiva: false as const }
@@ -220,7 +222,7 @@ export const useFichaStore = defineStore('ficha', () => {
     if (ficha.id == null) return false
     const sessao = await db.historico.where('estado').equals('em_andamento').first()
     if (sessao?.fichaId === ficha.id) throw new Error('Finalize ou cancele a sessão em andamento antes de excluir esta ficha.')
-    await db.transaction('rw', db.fichas, db.treinos, db.configuracoes, db.programacoes, async () => {
+    await comGravacaoGy(() => db.transaction('rw', db.fichas, db.treinos, db.configuracoes, db.programacoes, async () => {
       const config = await db.configuracoes.get('principal')
       if (config?.fichaAtivaId === ficha.id) {
         await db.configuracoes.put({ chave: 'principal', fichaAtivaId: null })
@@ -228,18 +230,18 @@ export const useFichaStore = defineStore('ficha', () => {
       }
       await db.treinos.where('fichaId').equals(ficha.id!).delete()
       await db.fichas.delete(ficha.id!)
-    })
+    }))
     fichaSelecionada.value = null
     modo.value = 'lista'
     await carregarDados()
     return true
   }
   const duplicarFicha = async (ficha: FichaCompleta) => {
-    await db.transaction('rw', db.fichas, db.treinos, async () => {
+    await comGravacaoGy(() => db.transaction('rw', db.fichas, db.treinos, async () => {
       const agora = new Date()
       const id = await db.fichas.add({ nome: `${ficha.nome} (cópia)`, foco: ficha.foco, descricao: ficha.descricao, corTema: ficha.corTema, origem: 'local', criadoEm: agora, atualizadoEm: agora })
       for (const treino of ficha.treinos) await db.treinos.add({ ...treino, id: undefined, fichaId: id, exercicios: treino.exercicios.map(ex => ({ ...ex, substitutosIds: [...ex.substitutosIds] })), criadoEm: agora, atualizadoEm: agora })
-    })
+    }))
     await carregarDados()
     feedback.success('Ficha duplicada com sucesso!')
   }
@@ -280,8 +282,8 @@ export const useFichaStore = defineStore('ficha', () => {
     criandoExercicio.value = true
     const urlFinal = novoEx.value.videoUrl || `https://www.youtube.com/results?search_query=execucao+${encodeURIComponent(novoEx.value.nome.trim())}`
     try {
-      const novo: ExercicioCatalogo = { ...novoEx.value, nome: novoEx.value.nome.trim(), videoUrl: urlFinal }
-      const id = await db.catalogo.add(novo)
+      const novo: ExercicioCatalogo = { ...novoEx.value, exercicioCanonicoId: novaIdentidadePersonalizada(), nome: novoEx.value.nome.trim(), videoUrl: urlFinal }
+      const id = await comGravacaoGy(() => db.catalogo.add(novo))
       catalogo.value = await db.catalogo.toArray()
       toggleExercicio({ ...novo, id })
       termoBusca.value = ''

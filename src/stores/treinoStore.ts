@@ -2,34 +2,16 @@ import { feedback } from '@/composables/useFeedback'
 import { confirmation } from '@/composables/useConfirm'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { db, type Ficha, type Treino, type ExercicioCatalogo, type ExercicioRealizado, type HistoricoTreino } from '@/database/db'
+import { db, type Ficha, type Treino, type ExercicioCatalogo, type HistoricoTreino } from '@/database/db'
 import { obterTreinoDoDia } from '@/utils/programacao'
 import { contextoConclusao } from '@/utils/diasLocais'
 import { sequencia } from '@/services/sequencia'
+import { comGravacaoGy } from '@/database/writeLock'
 
-export interface SerieExecucao {
-  numero: number;
-  pesoFito: number;
-  repsFeitas: string;
-  finalizada: boolean;
-}
-
-export interface ExercicioExecucao {
-  idUnico: string;
-  exercicioId: number;
-  nome: string;
-  grupoMuscular: string;
-  videoUrl?: string;
-  ordem: number;
-  seriesTotais: number;
-  repsAlvo: string;
-  pesoBasePlanejado: number;
-  taxaAumentoKg: number;
-  temDescanso: boolean;
-  descansoSegundos: number;
-  concluido: boolean;
-  seriesRealizadas: SerieExecucao[];
-}
+import { type ExercicioExecucao, trocarExercicio, usarReferencia, serializarExercicio, recuperarExercicio } from '@/utils/exercicioSessao'
+import { identidadeDoCatalogo } from '@/utils/identidadeExercicio'
+import { carregarUltimasExecucoes } from '@/services/historicoExercicio'
+import type { ExecucaoAnterior } from '@/utils/historicoExercicio'
 
 type EstadoSessao = NonNullable<HistoricoTreino['estado']>
 type TreinoDoDia = Treino & { corTema: string; fichaNome: string }
@@ -47,6 +29,10 @@ export const useTreinoStore = defineStore('treino', () => {
   const treinoFinalizadoHoje = ref(false)
 
   const exerciciosExecucao = ref<ExercicioExecucao[]>([])
+  const substituindo = ref(false)
+  const ultimasExecucoes = ref<Map<string, ExecucaoAnterior | null>>(new Map())
+  const erroHistorico = ref('')
+  const historicoCarregando = ref(false)
   const exercicioExpandido = ref<string | null>(null)
 
   const sessaoId = ref<number | null>(null)
@@ -59,6 +45,7 @@ export const useTreinoStore = defineStore('treino', () => {
   let timeoutSalvamento: ReturnType<typeof setTimeout> | null = null
   let filaPersistencia: Promise<boolean> = Promise.resolve(true)
   let criacaoSessaoPendente: Promise<boolean> | null = null
+  let backupPausado = false
 
   const descansoTempoRestante = ref(0)
   const descansoRodando = ref(false)
@@ -150,25 +137,7 @@ export const useTreinoStore = defineStore('treino', () => {
       ...(estado === 'em_andamento' ? {} : { dataFim: new Date() }),
       estado,
       duracaoMinutos: calcularSegundosDecorridos() / 60,
-      exerciciosRealizados: exerciciosExecucao.value.map((ex, index): ExercicioRealizado => ({
-        exercicioId: ex.exercicioId,
-        nome: ex.nome,
-        grupoMuscular: ex.grupoMuscular,
-        videoUrl: ex.videoUrl,
-        ordem: ex.ordem ?? index + 1,
-        seriesPlanejadas: ex.seriesTotais,
-        repsAlvo: ex.repsAlvo,
-        pesoBasePlanejado: ex.pesoBasePlanejado,
-        taxaAumentoKg: ex.taxaAumentoKg,
-        temDescanso: ex.temDescanso,
-        descansoSegundos: ex.descansoSegundos,
-        seriesRealizadas: ex.seriesRealizadas.map(serie => ({
-          numeroDaSerie: serie.numero,
-          peso: Number(serie.pesoFito) || 0,
-          reps: serie.repsFeitas,
-          finalizada: serie.finalizada
-        }))
-      }))
+      exerciciosRealizados: exerciciosExecucao.value.map(serializarExercicio)
     }
   }
 
@@ -185,11 +154,11 @@ export const useTreinoStore = defineStore('treino', () => {
     const criacao = (async () => {
       try {
         const registro = criarRegistroSessao()
-        const id = await db.transaction('rw', db.historico, async () => {
+        const id = await comGravacaoGy(() => db.transaction('rw', db.historico, async () => {
           const existente = await buscarSessaoAtiva()
           if (existente) throw new Error('Já existe outra sessão de treino em andamento.')
           return db.historico.add(registro)
-        })
+        }))
         sessaoId.value = id
         estadoPersistencia.value = 'salvo'
         erroPersistencia.value = null
@@ -226,7 +195,7 @@ export const useTreinoStore = defineStore('treino', () => {
 
     filaPersistencia = filaPersistencia.then(async () => {
       try {
-        const atualizado = await db.historico.update(id, registro)
+        const atualizado = await comGravacaoGy(() => db.historico.update(id, registro))
         if (!atualizado) throw new Error('A sessão não foi encontrada no banco local.')
         estadoPersistencia.value = 'salvo'
         erroPersistencia.value = null
@@ -241,13 +210,23 @@ export const useTreinoStore = defineStore('treino', () => {
   }
 
   const agendarSalvamento = () => {
-    if (sessaoEstado.value !== 'em_andamento') return
+    if (backupPausado || sessaoEstado.value !== 'em_andamento') return
     estadoPersistencia.value = 'salvando'
     if (timeoutSalvamento) clearTimeout(timeoutSalvamento)
     timeoutSalvamento = setTimeout(() => {
       void persistirSessaoAgora()
     }, TEMPO_DEBOUNCE_SALVAMENTO)
   }
+
+  const pausarParaBackup = async () => {
+    if (timeoutSalvamento) clearTimeout(timeoutSalvamento)
+    timeoutSalvamento = null
+    const salvo = sessaoEstado.value === 'em_andamento' ? await persistirSessaoAgora() : true
+    if (!salvo) throw new Error('Não foi possível salvar o treino em andamento antes do backup.')
+    await filaPersistencia
+    backupPausado = true
+  }
+  const retomarAposBackup = () => { backupPausado = false }
 
   watch(exerciciosExecucao, agendarSalvamento, { deep: true })
 
@@ -260,6 +239,8 @@ export const useTreinoStore = defineStore('treino', () => {
     return {
       idUnico: `ex_${index}`,
       exercicioId: ex.exercicioId,
+      exercicioCanonicoId: cat ? identidadeDoCatalogo(cat) : `gy:legado-local:${ex.exercicioId}`,
+      registrosEditados: false,
       nome: cat?.nome || 'Exercício desconhecido',
       grupoMuscular: cat?.grupoMuscular || 'Geral',
       videoUrl: cat?.videoUrl,
@@ -306,37 +287,14 @@ export const useTreinoStore = defineStore('treino', () => {
     sessaoDataInicio.value = sessao.dataInicio ? new Date(sessao.dataInicio) : new Date()
     sessaoEstado.value = 'em_andamento'
     treinoHoje.value = fichaDoSnapshot(sessao)
-    exerciciosExecucao.value = sessao.exerciciosRealizados.map((ex, index) => {
-      const series = ex.seriesRealizadas.map(serie => ({
-        numero: serie.numeroDaSerie,
-        pesoFito: Number(serie.peso) || 0,
-        repsFeitas: String(serie.reps),
-        finalizada: serie.finalizada === true
-      }))
-
-      return {
-        idUnico: `ex_${index}`,
-        exercicioId: ex.exercicioId,
-        nome: ex.nome || catalogo.value.find(cat => cat.id === ex.exercicioId)?.nome || 'Exercício desconhecido',
-        grupoMuscular: ex.grupoMuscular || catalogo.value.find(cat => cat.id === ex.exercicioId)?.grupoMuscular || 'Geral',
-        videoUrl: ex.videoUrl || catalogo.value.find(cat => cat.id === ex.exercicioId)?.videoUrl,
-        ordem: ex.ordem ?? index + 1,
-        seriesTotais: ex.seriesPlanejadas ?? series.length,
-        repsAlvo: ex.repsAlvo || '',
-        pesoBasePlanejado: ex.pesoBasePlanejado ?? 0,
-        taxaAumentoKg: ex.taxaAumentoKg ?? 0,
-        temDescanso: ex.temDescanso !== false,
-        descansoSegundos: ex.descansoSegundos ?? 60,
-        concluido: series.length > 0 && series.every(serie => serie.finalizada),
-        seriesRealizadas: series
-      }
-    })
+    exerciciosExecucao.value = sessao.exerciciosRealizados.map((ex, index) => recuperarExercicio(ex, catalogo.value, index))
     exercicioExpandido.value = exerciciosExecucao.value.find(ex => !ex.concluido)?.idUnico || null
     treinoFinalizadoHoje.value = false
     estadoAtual.value = 'execucao'
     estadoPersistencia.value = 'salvo'
     erroPersistencia.value = null
     iniciarCronometro()
+    void carregarReferencias()
   }
 
   const cancelarSessao = async (sessao: HistoricoTreino) => {
@@ -345,7 +303,7 @@ export const useTreinoStore = defineStore('treino', () => {
     if (sessao.id === sessaoId.value && !(await persistirSessaoAgora())) return false
 
     try {
-      await db.transaction('rw', db.historico, async () => {
+      await comGravacaoGy(() => db.transaction('rw', db.historico, async () => {
         const atual = await db.historico.get(sessao.id!)
         if (!atual || atual.estado !== 'em_andamento') return
         await db.historico.update(sessao.id!, {
@@ -353,7 +311,7 @@ export const useTreinoStore = defineStore('treino', () => {
           dataFim: new Date(),
           duracaoMinutos: Math.max(0, ((Date.now() - new Date(atual.dataInicio || Date.now()).getTime()) / 60000))
         })
-      })
+      }))
       void sequencia.recarregar()
       return true
     } catch (error) {
@@ -411,7 +369,9 @@ export const useTreinoStore = defineStore('treino', () => {
     erroPersistencia.value = null
     iniciarCronometro()
 
-    return await persistirNovaSessao()
+    const salvo = await persistirNovaSessao()
+    if (salvo) await carregarReferencias()
+    return salvo
   }
 
   const tentarSalvarNovamente = async () => {
@@ -420,6 +380,7 @@ export const useTreinoStore = defineStore('treino', () => {
   }
 
   const atualizarPesoSequencial = (idUnico: string, serieModificadaIndex: number) => {
+    marcarEdicao(idUnico)
     const ex = exerciciosExecucao.value.find(e => e.idUnico === idUnico)
     const serieModificada = ex?.seriesRealizadas[serieModificadaIndex]
     if (!ex || !serieModificada || !ex.taxaAumentoKg) return
@@ -458,6 +419,7 @@ export const useTreinoStore = defineStore('treino', () => {
   }
 
   const concluirSerie = (idUnico: string, serieIndex: number) => {
+    marcarEdicao(idUnico)
     const ex = exerciciosExecucao.value.find(e => e.idUnico === idUnico)
     const serieAtual = ex?.seriesRealizadas[serieIndex]
     if (!ex || !serieAtual) return
@@ -478,15 +440,18 @@ export const useTreinoStore = defineStore('treino', () => {
 
     ex.concluido = ex.seriesRealizadas.length > 0 && ex.seriesRealizadas.every(serie => serie.finalizada)
     if (ex.concluido) setTimeout(() => autoExpandirProximo(idUnico), 400)
+    void persistirSessaoAgora()
   }
 
   const concluirTodasSeries = (idUnico: string) => {
+    marcarEdicao(idUnico)
     const ex = exerciciosExecucao.value.find(e => e.idUnico === idUnico)
     if (ex) {
       ex.seriesRealizadas.forEach(serie => { serie.finalizada = true })
       ex.concluido = ex.seriesRealizadas.length > 0
       pularDescanso()
       setTimeout(() => autoExpandirProximo(idUnico), 400)
+      void persistirSessaoAgora()
     }
   }
 
@@ -496,6 +461,7 @@ export const useTreinoStore = defineStore('treino', () => {
       ex.seriesRealizadas.forEach(serie => { serie.finalizada = false })
       ex.concluido = false
       pularDescanso()
+      void persistirSessaoAgora()
     }
   }
 
@@ -543,7 +509,7 @@ export const useTreinoStore = defineStore('treino', () => {
       const id = sessaoId.value
       const concluidaEm = new Date()
       let novaConclusao = false
-      await db.transaction('rw', db.historico, async () => {
+      await comGravacaoGy(() => db.transaction('rw', db.historico, async () => {
         const atual = await db.historico.get(id)
         if (!atual) throw new Error('A sessão não foi encontrada no banco local.')
         if (atual.estado === 'finalizado') return
@@ -557,7 +523,7 @@ export const useTreinoStore = defineStore('treino', () => {
           estado: 'finalizado'
         })
         novaConclusao = true
-      })
+      }))
 
       pararCronometro()
       pularDescanso()
@@ -603,13 +569,63 @@ export const useTreinoStore = defineStore('treino', () => {
     return paletaCores.find(cor => cor.id === idCor) || paletaCores[1]
   }
 
+  let consultaHistorico = 0
+  const carregarReferencias = async () => {
+    const consulta = ++consultaHistorico
+    historicoCarregando.value = true
+    erroHistorico.value = ''
+    ultimasExecucoes.value = new Map()
+    try {
+      const dados = await carregarUltimasExecucoes([...new Set(exerciciosExecucao.value.flatMap(ex => ex.exercicioCanonicoId ? [ex.exercicioCanonicoId] : []))], catalogo.value)
+      if (consulta === consultaHistorico) ultimasExecucoes.value = dados
+    } catch { if (consulta === consultaHistorico) erroHistorico.value = 'Não foi possível consultar as cargas anteriores.' }
+    finally { if (consulta === consultaHistorico) historicoCarregando.value = false }
+  }
+  const marcarEdicao = (idUnico: string) => {
+    const ex = exerciciosExecucao.value.find(e => e.idUnico === idUnico)
+    if (ex) ex.registrosEditados = true
+  }
+  const substituirExercicio = async (idUnico: string, destinoId?: number) => {
+    if (substituindo.value || sessaoEstado.value !== 'em_andamento') return false
+    const index = exerciciosExecucao.value.findIndex(e => e.idUnico === idUnico)
+    const anterior = exerciciosExecucao.value[index]
+    if (!anterior) return false
+    const destino = destinoId === undefined ? undefined : catalogo.value.find(e => e.id === destinoId)
+    if (destinoId !== undefined && !destino) { feedback.error('O exercício selecionado não está disponível.'); return false }
+    substituindo.value = true
+    try {
+      const proximo = trocarExercicio(anterior, destino)
+      exerciciosExecucao.value[index] = proximo
+      if (!(await persistirSessaoAgora())) {
+        exerciciosExecucao.value[index] = anterior
+        feedback.error('Não foi possível salvar a substituição. O exercício anterior foi mantido.')
+        return false
+      }
+      await carregarReferencias()
+      feedback.success(destino ? 'Exercício substituído nesta sessão.' : 'Exercício original restaurado.')
+      return true
+    } catch (error) {
+      feedback.warning(error instanceof Error ? error.message : 'Não foi possível substituir o exercício.')
+      return false
+    } finally { substituindo.value = false }
+  }
+  const usarUltimasCargas = (idUnico: string) => {
+    const index = exerciciosExecucao.value.findIndex(e => e.idUnico === idUnico)
+    const ex = exerciciosExecucao.value[index]
+    const anterior = ex?.exercicioCanonicoId ? ultimasExecucoes.value.get(ex.exercicioCanonicoId) : null
+    if (!ex || !anterior) return
+    try { exerciciosExecucao.value[index] = usarReferencia(ex, anterior) }
+    catch (error) { feedback.warning(error instanceof Error ? error.message : 'Não foi possível usar as cargas anteriores.') }
+  }
+
   return {
+    catalogo, substituindo, ultimasExecucoes, erroHistorico, historicoCarregando, carregarReferencias, marcarEdicao, substituirExercicio, usarUltimasCargas,
     finalizando, estadoAtual, fichasSalvas, fichaAtual, treinoHoje, treinoAmanha, treinoFinalizadoHoje, exerciciosExecucao, exercicioExpandido,
     sessaoId, sessaoEstado, estadoPersistencia, erroPersistencia,
     cronometroFormatado, progressoTreino, modalTrocaAberto, modalVideoAberto, videoUrlAtivo, videoTituloAtivo,
     descansoTempoRestante, descansoRodando, descansoZerado,
     carregarTreinoDoDia, iniciarTreino, finalizarTreino, efetuarTrocaTreino, getCorObj,
     concluirSerie, concluirTodasSeries, resetarExercicio, atualizarPesoSequencial, abrirVideo, pularDescanso,
-    tentarSalvarNovamente, persistirSessaoAgora
+    tentarSalvarNovamente, persistirSessaoAgora, pausarParaBackup, retomarAposBackup
   }
 })
