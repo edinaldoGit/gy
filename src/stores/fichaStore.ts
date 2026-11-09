@@ -163,6 +163,9 @@ export const useFichaStore = defineStore('ficha', () => {
     if (!fichaId || !treinoEditando.value.nome.trim() || !treinoEditando.value.foco.trim() || treinoEditando.value.exercicios.length === 0) return false
     const dias = [...new Set(treinoEditando.value.diasDaSemana)].sort()
     if (dias.length !== 1) throw new Error('Escolha um único dia da semana para este treino.')
+    for (const [index, ex] of treinoEditando.value.exercicios.entries()) {
+      if (!Number.isInteger(ex.series) || ex.series < 1 || ex.series > 100 || !ex.repsAlvo.trim() || ex.repsAlvo.length > 100 || /^-/.test(ex.repsAlvo.trim()) || Number(ex.repsAlvo) <= 0 || !Number.isFinite(ex.taxaAumentoKg) || ex.taxaAumentoKg < 0 || ex.taxaAumentoKg > 1000 || !Number.isInteger(ex.descansoSegundos) || ex.descansoSegundos < 0 || ex.descansoSegundos > 86400 || !Number.isFinite(ex.pesoBaseAtual) || ex.pesoBaseAtual < 0 || ex.pesoBaseAtual > 10000) throw new Error(`Confira séries, repetições, carga e descanso do exercício ${index + 1}.`)
+    }
     const treinosExistentes = await db.treinos.where('fichaId').equals(fichaId).toArray()
     const conflito = conflitoDeDia(treinosExistentes, dias, treinoEditando.value.id)
     if (conflito !== null) throw new Error(`Já existe um treino marcado para ${['domingo', 'segunda-feira', 'terça-feira', 'quarta-feira', 'quinta-feira', 'sexta-feira', 'sábado'][conflito]}.`)

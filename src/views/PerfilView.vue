@@ -9,6 +9,7 @@ import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
 import BackupDados from '@/components/perfil/BackupDados.vue'
 import { comGravacaoGy } from '@/database/writeLock'
 import EvolucaoCorporal from '@/components/perfil/EvolucaoCorporal.vue'
+import AplicativoGy from '@/components/perfil/AplicativoGy.vue'
 
 const router = useRouter()
 const usuario = ref<Perfil | null>(null)
@@ -53,7 +54,7 @@ const apagarDados = async () => {
   <div v-else-if="usuario" class="flex flex-col gap-6 pb-20 animate-in fade-in duration-500">
     <SectionPageHeader titulo="Meu Perfil" subtitulo="Seus dados e evolução" tema="perfil" />
     
-    <div class="flex flex-col items-center mt-4">
+    <div class="flex flex-col items-center -mt-2">
       <div class="w-28 h-28 rounded-full bg-white shadow-lg flex items-center justify-center overflow-hidden border-4 border-white relative z-10">
         <img v-if="usuario.fotoPerfil" :src="usuario.fotoPerfil" class="w-full h-full object-cover" />
         <UserRound v-else :size="48" class="text-whitesmoke-300" />
@@ -122,6 +123,8 @@ const apagarDados = async () => {
     </div>
 
     <BackupDados />
+
+    <AplicativoGy />
 
     <button type="button" class="group flex w-full items-center gap-4 rounded-3xl border border-bubblegum-100 bg-white p-4 text-left shadow-sm transition hover:border-bubblegum-300 hover:bg-bubblegum-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bubblegum-600 sm:p-5" @click="mostrarEvolucao = true">
       <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-bubblegum-50 text-bubblegum-600 transition group-hover:bg-bubblegum-100"><ChartNoAxesCombined :size="23" /></span>

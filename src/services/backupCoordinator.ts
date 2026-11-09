@@ -1,10 +1,12 @@
 import { shallowRef } from 'vue'
 import { gravacoesBackupBloqueadas, obterBloqueioExclusivoGy } from '../database/writeLock'
+import { CHAVE_RASCUNHO_SESSAO } from '../utils/exercicioSessao'
 
 const canalNome = 'gy-backup-restauracao-v1'
 const idAba = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
 const online = new Map<string, number>()
 export const restauracaoBloqueada = shallowRef(false)
+export const operacaoBackupBloqueada = shallowRef(false)
 
 type Mensagem = { tipo: 'hello' | 'prepare' | 'ready' | 'failed' | 'release' | 'done'; aba: string; operacao?: string }
 let canal: BroadcastChannel | null = null
@@ -51,6 +53,7 @@ const receber = (evento: MessageEvent<Mensagem>) => {
   } else if (mensagem.tipo === 'done') {
     restauracaoBloqueada.value = true
     gravacoesBackupBloqueadas.value = true
+    try { sessionStorage.removeItem(CHAVE_RASCUNHO_SESSAO) } catch { }
     window.location.reload()
   }
 }

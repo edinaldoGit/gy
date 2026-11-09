@@ -8,7 +8,7 @@ import { contextoConclusao } from '@/utils/diasLocais'
 import { sequencia } from '@/services/sequencia'
 import { comGravacaoGy } from '@/database/writeLock'
 
-import { type ExercicioExecucao, trocarExercicio, usarReferencia, serializarExercicio, recuperarExercicio } from '@/utils/exercicioSessao'
+import { CHAVE_RASCUNHO_SESSAO, type ExercicioExecucao, trocarExercicio, usarReferencia, serializarExercicio, recuperarExercicio } from '@/utils/exercicioSessao'
 import { identidadeDoCatalogo } from '@/utils/identidadeExercicio'
 import { carregarUltimasExecucoes } from '@/services/historicoExercicio'
 import type { ExecucaoAnterior } from '@/utils/historicoExercicio'
@@ -38,6 +38,8 @@ export const useTreinoStore = defineStore('treino', () => {
   const sessaoId = ref<number | null>(null)
   const sessaoDataInicio = ref<Date | null>(null)
   const sessaoEstado = ref<EstadoSessao | null>(null)
+  const cancelando = ref(false)
+  const finalizando = ref(false)
   const estadoPersistencia = ref<'salvando' | 'salvo' | 'erro'>('salvo')
   const erroPersistencia = ref<string | null>(null)
   const segundosTreino = ref(0)
@@ -46,6 +48,10 @@ export const useTreinoStore = defineStore('treino', () => {
   let filaPersistencia: Promise<boolean> = Promise.resolve(true)
   let criacaoSessaoPendente: Promise<boolean> | null = null
   let backupPausado = false
+  let snapshotPersistido = ''
+  const snapshotsPendentes = new Set<string>()
+  const chaveRascunho = CHAVE_RASCUNHO_SESSAO
+  const assinatura = (registro: Pick<HistoricoTreino, 'exerciciosRealizados'>) => JSON.stringify(registro.exerciciosRealizados)
 
   const descansoTempoRestante = ref(0)
   const descansoRodando = ref(false)
@@ -145,7 +151,23 @@ export const useTreinoStore = defineStore('treino', () => {
     console.error('Erro ao salvar a sessão de treino:', error)
     if (estadoPersistencia.value !== 'erro') feedback.error('Não foi possível salvar a sessão. Confira o aviso no treino.')
     estadoPersistencia.value = 'erro'
-    erroPersistencia.value = 'Não foi possível salvar suas alterações. Mantenha o aplicativo aberto e tente novamente.'
+    erroPersistencia.value = error instanceof Error && error.message.startsWith('A sessão foi alterada')
+      ? error.message
+      : 'Não foi possível salvar suas alterações. Mantenha o aplicativo aberto e tente novamente.'
+  }
+
+  const preservarRascunho = () => {
+    if (sessaoEstado.value !== 'em_andamento' || sessaoId.value === null || typeof sessionStorage === 'undefined') return
+    try {
+      sessionStorage.setItem(chaveRascunho, JSON.stringify({ id: sessaoId.value, bases: [snapshotPersistido, ...snapshotsPendentes], registro: criarRegistroSessao() }))
+    } catch { /* O autosave no IndexedDB continua sendo a persistência principal. */ }
+  }
+  const limparRascunhoSalvo = (id: number, registro: Pick<HistoricoTreino, 'exerciciosRealizados'>) => {
+    if (typeof sessionStorage === 'undefined') return
+    try {
+      const rascunho = JSON.parse(sessionStorage.getItem(chaveRascunho) || 'null')
+      if (rascunho?.id === id && assinatura(rascunho.registro) === assinatura(registro)) sessionStorage.removeItem(chaveRascunho)
+    } catch { }
   }
 
   const persistirNovaSessao = () => {
@@ -160,6 +182,7 @@ export const useTreinoStore = defineStore('treino', () => {
           return db.historico.add(registro)
         }))
         sessaoId.value = id
+        snapshotPersistido = assinatura(registro)
         estadoPersistencia.value = 'salvo'
         erroPersistencia.value = null
         return true
@@ -187,23 +210,36 @@ export const useTreinoStore = defineStore('treino', () => {
 
     if (sessaoEstado.value !== 'em_andamento') return Promise.resolve(false)
     if (sessaoId.value === null) return persistirNovaSessao()
+    if (exerciciosExecucao.value.some(ex => !Number.isInteger(Number(ex.descansoSegundos)) || Number(ex.descansoSegundos) < 0 || Number(ex.descansoSegundos) > 86400 || ex.seriesRealizadas.some(serie => !String(serie.pesoFito).trim() || !Number.isFinite(Number(serie.pesoFito)) || Number(serie.pesoFito) < 0 || Number(serie.pesoFito) > 10000))) {
+      estadoPersistencia.value = 'erro'
+      erroPersistencia.value = 'Confira as cargas e o descanso antes de salvar. Os valores devem ser números válidos a partir de zero.'
+      return Promise.resolve(false)
+    }
 
     const id = sessaoId.value
     const registro = criarRegistroSessao()
+    const snapshot = assinatura(registro)
+    snapshotsPendentes.add(snapshot)
     estadoPersistencia.value = 'salvando'
     erroPersistencia.value = null
 
     filaPersistencia = filaPersistencia.then(async () => {
       try {
-        const atualizado = await comGravacaoGy(() => db.historico.update(id, registro))
-        if (!atualizado) throw new Error('A sessão não foi encontrada no banco local.')
+        await comGravacaoGy(() => db.transaction('rw', db.historico, async () => {
+          const atual = await db.historico.get(id)
+          if (!atual) throw new Error('A sessão não foi encontrada no banco local.')
+          if (atual.estado !== 'em_andamento' || assinatura(atual) !== snapshotPersistido) throw new Error('A sessão foi alterada em outra aba. Reabra o treino para carregar os dados salvos antes de continuar.')
+          await db.historico.update(id, registro)
+        }))
+        snapshotPersistido = snapshot
+        limparRascunhoSalvo(id, registro)
         estadoPersistencia.value = 'salvo'
         erroPersistencia.value = null
         return true
       } catch (error) {
         mostrarFalhaPersistencia(error)
         return false
-      }
+      } finally { snapshotsPendentes.delete(snapshot) }
     })
 
     return filaPersistencia
@@ -250,7 +286,7 @@ export const useTreinoStore = defineStore('treino', () => {
       pesoBasePlanejado,
       taxaAumentoKg,
       temDescanso: (ex as typeof ex & { temDescanso?: boolean }).temDescanso !== false,
-      descansoSegundos: ex.descansoSegundos || 60,
+      descansoSegundos: ex.descansoSegundos ?? 60,
       concluido: false,
       seriesRealizadas: Array.from({ length: seriesTotais }, (_, serieIndex) => ({
         numero: serieIndex + 1,
@@ -283,11 +319,20 @@ export const useTreinoStore = defineStore('treino', () => {
   const restaurarSessao = (sessao: HistoricoTreino) => {
     if (sessao.id === undefined || sessao.estado !== 'em_andamento') return
 
+    snapshotPersistido = assinatura(sessao)
+    let exercicios = sessao.exerciciosRealizados
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        const rascunho = JSON.parse(sessionStorage.getItem(chaveRascunho) || 'null')
+        if (rascunho?.id === sessao.id && rascunho.registro?.dataInicio === new Date(sessao.dataInicio).toISOString() && Array.isArray(rascunho.bases) && rascunho.bases.includes(snapshotPersistido) && Array.isArray(rascunho.registro.exerciciosRealizados)) exercicios = rascunho.registro.exerciciosRealizados
+      } catch { }
+    }
+
     sessaoId.value = sessao.id
     sessaoDataInicio.value = sessao.dataInicio ? new Date(sessao.dataInicio) : new Date()
     sessaoEstado.value = 'em_andamento'
     treinoHoje.value = fichaDoSnapshot(sessao)
-    exerciciosExecucao.value = sessao.exerciciosRealizados.map((ex, index) => recuperarExercicio(ex, catalogo.value, index))
+    exerciciosExecucao.value = exercicios.map((ex, index) => recuperarExercicio(ex, catalogo.value, index))
     exercicioExpandido.value = exerciciosExecucao.value.find(ex => !ex.concluido)?.idUnico || null
     treinoFinalizadoHoje.value = false
     estadoAtual.value = 'execucao'
@@ -295,29 +340,75 @@ export const useTreinoStore = defineStore('treino', () => {
     erroPersistencia.value = null
     iniciarCronometro()
     void carregarReferencias()
+    if (exercicios !== sessao.exerciciosRealizados) void persistirSessaoAgora()
   }
 
   const cancelarSessao = async (sessao: HistoricoTreino) => {
-    if (sessao.id === undefined) return false
+    if (sessao.id === undefined || cancelando.value || finalizando.value) return false
 
-    if (sessao.id === sessaoId.value && !(await persistirSessaoAgora())) return false
-
+    cancelando.value = true
     try {
-      await comGravacaoGy(() => db.transaction('rw', db.historico, async () => {
+      if (sessao.id === sessaoId.value) {
+        if (timeoutSalvamento) clearTimeout(timeoutSalvamento)
+        timeoutSalvamento = null
+        if (!(await persistirSessaoAgora())) return false
+      }
+
+      const cancelada = await comGravacaoGy(() => db.transaction('rw', db.historico, async () => {
         const atual = await db.historico.get(sessao.id!)
-        if (!atual || atual.estado !== 'em_andamento') return
+        if (!atual || atual.estado !== 'em_andamento') return false
+        if (sessao.id === sessaoId.value && assinatura(atual) !== snapshotPersistido) {
+          throw new Error('A sessão foi alterada em outra aba. Reabra o treino antes de cancelá-lo.')
+        }
         await db.historico.update(sessao.id!, {
           estado: 'cancelado',
           dataFim: new Date(),
           duracaoMinutos: Math.max(0, ((Date.now() - new Date(atual.dataInicio || Date.now()).getTime()) / 60000))
         })
+        return true
       }))
+      if (!cancelada) throw new Error('A sessão não está mais em andamento e não pôde ser cancelada.')
+
+      if (sessao.id === sessaoId.value) {
+        if (timeoutSalvamento) clearTimeout(timeoutSalvamento)
+        timeoutSalvamento = null
+        pararCronometro()
+        pularDescanso()
+        sessaoEstado.value = 'cancelado'
+        estadoPersistencia.value = 'salvo'
+        erroPersistencia.value = null
+        estadoAtual.value = 'preview'
+        treinoFinalizadoHoje.value = false
+        exerciciosExecucao.value = []
+        exercicioExpandido.value = null
+        sessaoDataInicio.value = null
+        segundosTreino.value = 0
+        if (typeof sessionStorage !== 'undefined') {
+          try {
+            const rascunho = JSON.parse(sessionStorage.getItem(chaveRascunho) || 'null')
+            if (rascunho?.id === sessao.id) sessionStorage.removeItem(chaveRascunho)
+          } catch { }
+        }
+      }
+
       void sequencia.recarregar()
+      feedback.success('Treino cancelado. Ele não contará como concluído.')
       return true
     } catch (error) {
       mostrarFalhaPersistencia(error)
       return false
+    } finally {
+      cancelando.value = false
     }
+  }
+
+  const cancelarTreino = async () => {
+    if (sessaoEstado.value !== 'em_andamento' || cancelando.value || finalizando.value) return false
+    if (sessaoId.value === null) {
+      const criada = await (criacaoSessaoPendente || persistirNovaSessao())
+      if (!criada || sessaoId.value === null) return false
+    }
+    return cancelarSessao({ id: sessaoId.value } as HistoricoTreino)
   }
 
   const iniciarTreino = async (fichaSolicitada?: TreinoDoDia) => {
@@ -348,7 +439,6 @@ export const useTreinoStore = defineStore('treino', () => {
         restaurarSessao(sessaoAtiva)
         return false
       }
-      feedback.info('Treino anterior cancelado.')
     }
 
     if (!ficha.id || !ficha.fichaId) {
@@ -425,6 +515,7 @@ export const useTreinoStore = defineStore('treino', () => {
     if (!ex || !serieAtual) return
 
     if (!serieAtual.finalizada) {
+      if (!validarSerie(serieAtual)) return
       if (serieIndex > 0 && !ex.seriesRealizadas[serieIndex - 1].finalizada) {
         feedback.warning('Complete a série anterior antes de avançar!')
         return
@@ -447,6 +538,7 @@ export const useTreinoStore = defineStore('treino', () => {
     marcarEdicao(idUnico)
     const ex = exerciciosExecucao.value.find(e => e.idUnico === idUnico)
     if (ex) {
+      if (!ex.seriesRealizadas.length || ex.seriesRealizadas.some(serie => !validarSerie(serie))) return
       ex.seriesRealizadas.forEach(serie => { serie.finalizada = true })
       ex.concluido = ex.seriesRealizadas.length > 0
       pularDescanso()
@@ -488,9 +580,8 @@ export const useTreinoStore = defineStore('treino', () => {
     modalVideoAberto.value = true
   }
 
-  const finalizando = ref(false)
   const finalizarTreino = async () => {
-    if (finalizando.value) return false
+    if (finalizando.value || cancelando.value) return false
     finalizando.value = true
     try { return await executarFinalizacao() } finally { finalizando.value = false }
   }
@@ -501,6 +592,7 @@ export const useTreinoStore = defineStore('treino', () => {
       return true
     }
     if (sessaoEstado.value !== 'em_andamento' || exerciciosExecucao.value.some(ex => !ex.concluido)) return false
+    if (exerciciosExecucao.value.some(ex => !ex.seriesRealizadas.length || ex.seriesRealizadas.some(serie => !validarSerie(serie)))) return false
 
     if (!(await persistirSessaoAgora()) || sessaoId.value === null) return false
     atualizarCronometro()
@@ -514,6 +606,7 @@ export const useTreinoStore = defineStore('treino', () => {
         if (!atual) throw new Error('A sessão não foi encontrada no banco local.')
         if (atual.estado === 'finalizado') return
         if (atual.estado !== 'em_andamento') throw new Error('A sessão não está mais em andamento.')
+        if (assinatura(atual) !== snapshotPersistido) throw new Error('A sessão foi alterada em outra aba. Reabra o treino para carregar os dados salvos antes de continuar.')
 
         await db.historico.update(id, {
           ...criarRegistroSessao('finalizado'),
@@ -585,6 +678,13 @@ export const useTreinoStore = defineStore('treino', () => {
     const ex = exerciciosExecucao.value.find(e => e.idUnico === idUnico)
     if (ex) ex.registrosEditados = true
   }
+  const validarSerie = (serie: ExercicioExecucao['seriesRealizadas'][number]) => {
+    if (!String(serie.pesoFito).trim() || !Number.isFinite(Number(serie.pesoFito)) || Number(serie.pesoFito) < 0 || Number(serie.pesoFito) > 10000 || !String(serie.repsFeitas).trim() || !Number.isInteger(Number(serie.repsFeitas)) || Number(serie.repsFeitas) <= 0 || Number(serie.repsFeitas) > 10000) {
+      feedback.warning('Confira a série: informe uma carga válida a partir de zero e um número inteiro positivo de repetições.')
+      return false
+    }
+    return true
+  }
   const substituirExercicio = async (idUnico: string, destinoId?: number) => {
     if (substituindo.value || sessaoEstado.value !== 'em_andamento') return false
     const index = exerciciosExecucao.value.findIndex(e => e.idUnico === idUnico)
@@ -621,11 +721,11 @@ export const useTreinoStore = defineStore('treino', () => {
   return {
     catalogo, substituindo, ultimasExecucoes, erroHistorico, historicoCarregando, carregarReferencias, marcarEdicao, substituirExercicio, usarUltimasCargas,
     finalizando, estadoAtual, fichasSalvas, fichaAtual, treinoHoje, treinoAmanha, treinoFinalizadoHoje, exerciciosExecucao, exercicioExpandido,
-    sessaoId, sessaoEstado, estadoPersistencia, erroPersistencia,
+    sessaoId, sessaoEstado, cancelando, estadoPersistencia, erroPersistencia,
     cronometroFormatado, progressoTreino, modalTrocaAberto, modalVideoAberto, videoUrlAtivo, videoTituloAtivo,
     descansoTempoRestante, descansoRodando, descansoZerado,
-    carregarTreinoDoDia, iniciarTreino, finalizarTreino, efetuarTrocaTreino, getCorObj,
+    carregarTreinoDoDia, iniciarTreino, cancelarTreino, finalizarTreino, efetuarTrocaTreino, getCorObj,
     concluirSerie, concluirTodasSeries, resetarExercicio, atualizarPesoSequencial, abrirVideo, pularDescanso,
-    tentarSalvarNovamente, persistirSessaoAgora, pausarParaBackup, retomarAposBackup
+    tentarSalvarNovamente, persistirSessaoAgora, preservarRascunho, pausarParaBackup, retomarAposBackup
   }
 })

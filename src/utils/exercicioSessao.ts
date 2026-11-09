@@ -2,6 +2,8 @@ import type { ExercicioCatalogo, ExercicioPlanejadoSnapshot, ExercicioRealizado 
 import type { ExecucaoAnterior } from './historicoExercicio.ts'
 import { identidadeDoCatalogo, identidadeHistorica } from './identidadeExercicio.ts'
 
+export const CHAVE_RASCUNHO_SESSAO = 'gy:sessao-pendente:v1'
+
 export interface SerieExecucao {
   numero: number;
   pesoFito: number;

@@ -89,7 +89,7 @@ async function excluir(registro: MedidaCorporal) {
 }
 
 function valoresRegistro(registro: MedidaCorporal) {
-  return campos.filter(campo => registro[campo.chave] !== undefined).map(campo => `${campo.nome}: ${registro[campo.chave]} ${campo.unidade}`)
+  return campos.filter(campo => registro[campo.chave] !== undefined).map(campo => `${campo.nome}: ${new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 2 }).format(registro[campo.chave]!)} ${campo.unidade}`)
 }
 
 onMounted(async () => { iniciarNovo(); await carregar() })

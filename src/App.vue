@@ -3,22 +3,61 @@ import { onMounted, onBeforeUnmount, watch } from 'vue'
 import ConfirmDialog from '@/components/feedback/ConfirmDialog.vue'
 import { confirmation } from '@/composables/useConfirm'
 import { feedback } from '@/composables/useFeedback'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import TopBar from '@/components/layout/TopBar.vue'
 import { sequencia } from '@/services/sequencia'
 import { iniciarCoordenacaoBackup, restauracaoBloqueada } from '@/services/backupCoordinator'
 import { useTreinoStore } from '@/stores/treinoStore'
+import { useModalAcessibilidade } from '@/composables/useModalAcessibilidade'
+import { useRegisterSW } from 'virtual:pwa-register/vue'
+import { conectarRegistroPwa, iniciarPwaRuntime, pwaApp, registrarServiceWorker, verificarAtualizacoes } from '@/services/pwaRuntime'
 
 const route = useRoute()
+const router = useRouter()
 const { state } = confirmation
 let interval: ReturnType<typeof setInterval> | undefined
 let pararSequencia: (() => void) | undefined
 let pararCoordenacaoBackup: (() => void) | undefined
 const treino = useTreinoStore()
+const modalAberto = useModalAcessibilidade()
+let pararPwaRuntime: (() => void) | undefined
+let pararVerificacoes: (() => void) | undefined
+let ultimaVerificacao = 0
+let notificouAtualizacao = false
+const pwa = useRegisterSW({
+  immediate: true,
+  onRegisteredSW: (_url: string, registration: ServiceWorkerRegistration | undefined) => registrarServiceWorker(registration),
+  onNeedRefresh: () => {
+    pwaApp.updateAvailable = true
+    if (notificouAtualizacao) return
+    notificouAtualizacao = true
+    feedback.info(treino.sessaoEstado === 'em_andamento' ? 'Nova versão disponível. A atualização ficará para depois do treino.' : 'Uma nova versão do Gy está disponível.')
+  },
+  onOfflineReady: () => {},
+  onRegisterError: () => { pwaApp.updateSupported = false }
+})
+const conexaoRegistro = conectarRegistroPwa(pwa.needRefresh, pwa.updateServiceWorker, 'serviceWorker' in navigator)
+pararPwaRuntime = iniciarPwaRuntime()
+pararVerificacoes = conexaoRegistro.stop
+watch(pwa.needRefresh, conexaoRegistro.sincronizarPendente, { immediate: true })
+const coresSistema: Record<string, string> = {
+  treino: '#9b44bb', fichas: '#2680a6', historico: '#3f868d', perfil: '#fc6471'
+}
+const coresFeedback: Record<string, string> = { success: '#72b9c0', error: '#fc7a86', warning: '#fcd34d', info: '#59b3d9' }
+watch([() => route.path, feedback.current], ([path, mensagem]) => {
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+  if (!meta) return
+  const secao = path === '/fichas' ? 'fichas' : path === '/historico' ? 'historico' : path === '/perfil' ? 'perfil' : 'treino'
+  meta.content = mensagem ? coresFeedback[mensagem.kind] ?? coresSistema[secao] : coresSistema[secao]
+}, { immediate: true })
+watch(modalAberto, aberto => feedback.pause('modal', aberto))
 const visibility = () => feedback.pause('hidden', document.hidden)
 watch(() => route.path === '/onboarding', hidden => feedback.pause('no-surface', hidden), { immediate: true })
 watch(() => !!state.value.options, open => feedback.pause('confirmation', open), { flush: 'sync' })
 onMounted(() => {
+  void router.isReady().then(() => {
+    if (route.path !== '/' && route.path !== '/onboarding') void treino.carregarTreinoDoDia()
+  })
   pararSequencia = sequencia.iniciar()
   pararCoordenacaoBackup = iniciarCoordenacaoBackup(async () => {
     if (state.value.busy) throw new Error('Outra confirmação está em andamento nesta aba.')
@@ -28,18 +67,34 @@ onMounted(() => {
   visibility()
   document.addEventListener('visibilitychange', visibility)
   interval = setInterval(feedback.tick, 50)
+  if (navigator.onLine) setTimeout(() => { ultimaVerificacao = Date.now(); void verificarAtualizacoes() }, 2500)
+  const verificarAoVoltar = () => {
+    if (!document.hidden && navigator.onLine && Date.now() - ultimaVerificacao > 15 * 60 * 1000) {
+      ultimaVerificacao = Date.now()
+      void verificarAtualizacoes()
+    }
+  }
+  const verificarConexao = () => {
+    if (navigator.onLine) { ultimaVerificacao = Date.now(); void verificarAtualizacoes() }
+  }
+  const timerAtualizacoes = setInterval(() => {
+    if (navigator.onLine) { ultimaVerificacao = Date.now(); void verificarAtualizacoes() }
+  }, 6 * 60 * 60 * 1000)
+  document.addEventListener('visibilitychange', verificarAoVoltar)
+  window.addEventListener('online', verificarConexao)
+  pararVerificacoes = () => { conexaoRegistro.stop(); clearInterval(timerAtualizacoes); document.removeEventListener('visibilitychange', verificarAoVoltar); window.removeEventListener('online', verificarConexao) }
 })
-onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
+onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwaRuntime?.(); pararVerificacoes?.(); clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
 </script>
 
 <template>
   <div class="flex h-dvh flex-col overflow-hidden bg-whitesmoke-50">
     
-    <div v-if="route.path !== '/onboarding'" class="relative z-[100] shrink-0" :inert="!!state.options || restauracaoBloqueada"><TopBar /></div>
+    <div v-if="route.path !== '/onboarding'" class="relative z-[100] shrink-0" :inert="modalAberto || !!state.options || restauracaoBloqueada"><TopBar /></div>
 
     <div class="relative isolate z-0 min-h-0 flex-1 [container-type:size]">
 
-    <main tabindex="-1" :inert="!!state.options || restauracaoBloqueada" class="h-full min-h-0 overflow-y-auto px-4 pb-4" :class="{ '!overflow-hidden': !!state.options }">
+    <main tabindex="-1" :inert="!!state.options || restauracaoBloqueada" class="h-full min-h-0 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" :class="{ '!overflow-hidden': !!state.options }">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />

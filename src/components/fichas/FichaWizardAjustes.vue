@@ -49,12 +49,12 @@ const nomeExercicio = (id: number) => catalogo.value.find(ex => ex.id === id)
         <div class="flex items-center gap-2">
           <input 
             type="number" 
-            v-model.number="descansoGlobal" 
+            v-model.number="descansoGlobal" aria-label="Descanso global em segundos" min="0" max="86400"
             class="w-14 bg-whitesmoke-50 rounded-xl px-2 py-2 text-center font-bold text-sm border border-whitesmoke-200 outline-none focus:ring-2 focus:border-whitesmoke-300 focus:ring-whitesmoke-200 transition-all" 
           />
           <span class="text-xs font-bold text-whitesmoke-400">s</span>
           <button 
-            @click="aplicarDescansoLocal" 
+            @click="aplicarDescansoLocal" aria-label="Aplicar descanso global"
             class="p-2 rounded-xl text-white transition-colors active:scale-95 shadow-sm"
             :class="[temaAtual.bg]"
           >
@@ -79,7 +79,7 @@ const nomeExercicio = (id: number) => catalogo.value.find(ex => ex.id === id)
               <p class="text-[10px] font-bold text-whitesmoke-400 uppercase tracking-widest mt-0.5">{{ nomeExercicio(ex.exercicioId)?.grupoMuscular || 'Exercício personalizado' }}</p>
             </div>
           </div>
-          <button @click="removerExercicioDaFicha(index)" class="text-red-400 p-2 hover:bg-red-50 rounded-xl transition-colors shrink-0">
+          <button @click="removerExercicioDaFicha(index)" :aria-label="`Remover ${nomeExercicio(ex.exercicioId)?.nome || 'exercício'}`" class="text-red-400 p-2 hover:bg-red-50 rounded-xl transition-colors shrink-0">
             <Trash2 :size="16" />
           </button>
         </div>
@@ -87,27 +87,27 @@ const nomeExercicio = (id: number) => catalogo.value.find(ex => ex.id === id)
         <div class="grid grid-cols-2 gap-2">
           <div class="bg-whitesmoke-50 rounded-xl p-2 border border-whitesmoke-100 flex flex-col items-center">
             <span class="block text-[9px] font-bold text-whitesmoke-400 uppercase tracking-wider mb-1">Séries</span>
-            <input type="number" v-model.number="ex.series" class="w-full bg-transparent text-center font-semibold text-whitesmoke-950 text-sm outline-none" />
+            <input type="number" v-model.number="ex.series" :aria-label="`Séries de ${nomeExercicio(ex.exercicioId)?.nome}`" min="1" max="100" class="w-full bg-transparent text-center font-semibold text-whitesmoke-950 text-sm outline-none" />
           </div>
           <div class="bg-whitesmoke-50 rounded-xl p-2 border border-whitesmoke-100 flex flex-col items-center">
             <span class="block text-[9px] font-bold text-whitesmoke-400 uppercase tracking-wider mb-1">Reps Alvo</span>
-            <input type="text" v-model="ex.repsAlvo" class="w-full bg-transparent text-center font-semibold text-whitesmoke-950 text-sm outline-none" />
+            <input type="text" v-model="ex.repsAlvo" :aria-label="`Repetições alvo de ${nomeExercicio(ex.exercicioId)?.nome}`" class="w-full bg-transparent text-center font-semibold text-whitesmoke-950 text-sm outline-none" />
           </div>
           
           <div class="bg-whitesmoke-50 rounded-xl p-2 border border-whitesmoke-100 flex flex-col items-center">
             <span class="block text-[9px] font-bold text-whitesmoke-400 uppercase tracking-wider mb-1">Taxa (+kg)</span>
-            <input type="number" v-model.number="ex.taxaAumentoKg" class="w-full bg-transparent text-center font-semibold text-whitesmoke-950 text-sm outline-none" />
+            <input type="number" v-model.number="ex.taxaAumentoKg" :aria-label="`Aumento de carga de ${nomeExercicio(ex.exercicioId)?.nome} em kg`" min="0" max="1000" class="w-full bg-transparent text-center font-semibold text-whitesmoke-950 text-sm outline-none" />
           </div>
           
           <div class="bg-teal-50/50 rounded-xl p-2 border flex flex-col items-center justify-between" :class="(ex as any).temDescanso !== false ? 'border-teal-100' : 'border-whitesmoke-200 grayscale opacity-50'">
             <div class="w-full flex items-center justify-between px-1">
               <Timer :size="12" class="text-teal-600" />
-              <button @click="toggleDescansoExercicio(ex)" class="w-8 h-4 rounded-full p-0.5 transition-colors" :class="(ex as any).temDescanso !== false ? 'bg-teal-500' : 'bg-whitesmoke-300'">
+              <button @click="toggleDescansoExercicio(ex)" :aria-label="`Descanso de ${nomeExercicio(ex.exercicioId)?.nome}`" :aria-pressed="ex.temDescanso !== false" class="w-8 h-4 rounded-full p-0.5 transition-colors" :class="(ex as any).temDescanso !== false ? 'bg-teal-500' : 'bg-whitesmoke-300'">
                 <div class="w-3 h-3 bg-white rounded-full transition-transform" :class="(ex as any).temDescanso !== false ? 'translate-x-4' : 'translate-x-0'"></div>
               </button>
             </div>
             <div class="flex items-end gap-1 mt-1">
-              <input type="number" v-model.number="ex.descansoSegundos" :disabled="(ex as any).temDescanso === false" class="w-10 bg-transparent text-center font-semibold text-teal-700 text-sm outline-none disabled:bg-transparent" />
+              <input type="number" v-model.number="ex.descansoSegundos" :aria-label="`Descanso de ${nomeExercicio(ex.exercicioId)?.nome} em segundos`" min="0" max="86400" :disabled="(ex as any).temDescanso === false" class="w-10 bg-transparent text-center font-semibold text-teal-700 text-sm outline-none disabled:bg-transparent" />
               <span class="text-[9px] font-bold text-teal-600 uppercase tracking-wider pb-1">seg</span>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { feedback } from '@/composables/useFeedback'
 import { confirmation } from '@/composables/useConfirm'
 import { useTreinoStore } from '@/stores/treinoStore'
 import { adaptadorDexie, arquivoBackup, exportarBackup, lerArquivoBackup, resumoBackup, restaurarBackup, TAMANHO_MAXIMO_BACKUP, type DocumentoBackup } from '@/services/backup'
-import { iniciarRestauracaoExclusiva, restauracaoBloqueada } from '@/services/backupCoordinator'
+import { iniciarRestauracaoExclusiva, restauracaoBloqueada, operacaoBackupBloqueada } from '@/services/backupCoordinator'
 
 const treino = useTreinoStore()
 const seletor = ref<HTMLInputElement | null>(null)
@@ -18,6 +18,7 @@ const restaurando = ref(false)
 const exportar = async () => {
   if (exportando.value || restaurando.value) return
   exportando.value = true
+  operacaoBackupBloqueada.value = true
   feedback.info('Preparando seu backup…')
   try {
     if (treino.sessaoEstado === 'em_andamento' && !(await treino.persistirSessaoAgora())) throw new Error('Não foi possível salvar o treino em andamento. Tente novamente antes de exportar.')
@@ -33,7 +34,7 @@ const exportar = async () => {
   } catch (e) {
     erro.value = e instanceof Error ? e.message : 'Não foi possível gerar o backup.'
     feedback.error(erro.value)
-  } finally { exportando.value = false }
+  } finally { exportando.value = false; operacaoBackupBloqueada.value = false }
 }
 
 const abrirSeletor = () => { erro.value = ''; seletor.value?.click() }
@@ -60,6 +61,7 @@ const exportarAntesDeRestaurar = async () => {
 const solicitarRestauracao = async () => {
   if (!documento.value || restaurando.value || exportando.value) return
   restaurando.value = true
+  operacaoBackupBloqueada.value = true
   let coordenacao: Awaited<ReturnType<typeof iniciarRestauracaoExclusiva>> | null = null
   let concluiu = false
   try {
@@ -89,6 +91,7 @@ const solicitarRestauracao = async () => {
   } finally {
     if (!concluiu) coordenacao?.cancelar()
     restaurando.value = false
+    operacaoBackupBloqueada.value = false
   }
 }
 

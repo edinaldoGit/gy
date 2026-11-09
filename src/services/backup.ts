@@ -2,6 +2,7 @@ import { db, type ConfiguracaoApp, type ExercicioCatalogo, type Ficha, type Hist
 
 import { identidadeValida, identidadeOficial } from '../utils/identidadeExercicio.ts'
 import { exerciciosSeed } from '../data/catalogoOficial.ts'
+import { CHAVE_RASCUNHO_SESSAO } from '../utils/exercicioSessao.ts'
 
 export const FORMATO_BACKUP = 'gy-backup'
 export const VERSAO_BACKUP = 3
@@ -216,9 +217,9 @@ export function validarBackup(entrada: unknown): DocumentoBackup {
 }
 
 const transformarDatas = (tabelas: TabelasBackup, serializar: boolean) => {
-  const resultado = structuredClone(tabelas) as unknown as Record<keyof TabelasBackup, Array<Record<string, unknown>>>
+  const resultado = JSON.parse(JSON.stringify(tabelas)) as Record<keyof TabelasBackup, Array<Record<string, unknown>>>
   for (const tabela of Object.keys(datasPorTabela) as Array<keyof TabelasBackup>) for (const registro of resultado[tabela]) {
-    for (const campo of datasPorTabela[tabela]) if (registro[campo] !== undefined) registro[campo] = serializar ? (registro[campo] as Date).toISOString() : new Date(registro[campo] as string)
+    for (const campo of datasPorTabela[tabela]) if (registro[campo] !== undefined) registro[campo] = serializar ? new Date(registro[campo] as string).toISOString() : new Date(registro[campo] as string)
   }
   return resultado as unknown as TabelasBackup
 }
@@ -253,6 +254,7 @@ export function resumoBackup(documento: DocumentoBackup): ResumoBackup {
 export async function restaurarBackup(adaptador: AdaptadorBackup, documento: DocumentoBackup): Promise<void> {
   const validado = validarBackup(documento)
   await adaptador.substituir(transformarDatas(validado.tabelas, false))
+  try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(CHAVE_RASCUNHO_SESSAO) } catch { }
 }
 
 export const adaptadorDexie: AdaptadorBackup = {

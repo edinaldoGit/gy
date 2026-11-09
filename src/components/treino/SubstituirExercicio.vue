@@ -45,7 +45,7 @@ const selecionar = async (id: number) => {
   <div :class="modalSheetBackdrop" @click.self="fechar">
     <section ref="painel" role="dialog" aria-modal="true" aria-labelledby="substituto-titulo" tabindex="-1" :aria-busy="store.substituindo" :class="[modalSheetPanel, 'outline-none sm:inset-x-auto sm:left-1/2 sm:w-full sm:max-w-xl sm:-translate-x-1/2']">
       <ModalSheetHeader titulo="Escolher substituto" :subtitulo="`Planejado: ${slot?.planejado?.nome ?? slot?.nome ?? ''}`" etiqueta="Nesta sessão" cor-classe="bg-amethyst-500" titulo-id="substituto-titulo" :desabilitado="store.substituindo" @fechar="fechar" />
-      <div class="min-h-0 space-y-4 overflow-y-auto overscroll-contain p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-6">
+      <div class="min-h-0 space-y-4 overflow-y-auto overscroll-contain p-4 pb-6 sm:p-6">
         <p class="text-xs leading-relaxed text-whitesmoke-500">A ficha original permanece igual. As cargas de exercícios diferentes não são equivalentes. Considere suas limitações ao escolher.</p>
         <p v-if="erro" role="alert" class="rounded-xl bg-bubblegum-50 p-3 text-sm text-bubblegum-800">{{ erro }}</p>
         <template v-if="!manual">

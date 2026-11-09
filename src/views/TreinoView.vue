@@ -23,11 +23,13 @@ onUnmounted(() => {
 })
 
 const salvarSessaoAntesDeFechar = () => {
+  store.preservarRascunho()
   void store.persistirSessaoAgora()
 }
 
 const salvarSessaoAoOcultar = () => {
   if (document.visibilityState === 'hidden') {
+    store.preservarRascunho()
     void store.persistirSessaoAgora()
   }
 }

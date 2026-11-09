@@ -3,20 +3,30 @@ import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { readFileSync } from 'node:fs';
 
-export default defineConfig({
+const versao = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
+
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/gy/' : '/',
+  define: { __GY_VERSION__: JSON.stringify(versao) },
   plugins: [
     vue(),
     tailwindcss(),
     VitePWA({
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      registerType: 'prompt',
+      injectRegister: false,
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'Fredoka-OFL.txt'],
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest}']
+        clientsClaim: true,
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,ttf,txt}']
       },
       manifest: {
         name: 'Gy',
         short_name: 'Gy',
+        id: './',
+        start_url: './',
+        scope: './',
         description: 'Organização de treinos e acompanhamento de evolução física.',
         lang: 'pt-BR',
         theme_color: '#FC6471',
@@ -45,4 +55,4 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src')
     }
   }
-});
+}));

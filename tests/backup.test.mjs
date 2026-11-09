@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { reactive } from 'vue'
 import { calcularSequencia } from '../src/utils/sequencia.ts'
 import { FORMATO_BACKUP, TAMANHO_MAXIMO_BACKUP, exportarBackup, lerArquivoBackup, restaurarBackup, resumoBackup, validarBackup } from '../src/services/backup.ts'
 import { comGravacaoGy, gravacoesBackupBloqueadas } from '../src/database/writeLock.ts'
@@ -119,6 +120,34 @@ test('restaura em substituição, preserva IDs e datas e pode ser repetido sem d
   await restaurarBackup(destino, backup)
   assert.deepEqual(destino.tabelas, origem.tabelas)
   assert.ok(destino.tabelas.historico[0].dataFim instanceof Date)
+})
+
+test('restaura documento reativo do seletor Vue sem DataCloneError ou perda de campos', async () => {
+  const origem = fixture()
+  const backup = reactive(await exportarBackup(adaptador(origem), agora))
+  const destino = adaptador({})
+  await restaurarBackup(destino, backup)
+  assert.deepEqual(destino.tabelas, origem)
+  assert.ok(destino.tabelas.historico[0].dataFim instanceof Date)
+})
+
+test('descarta rascunho da instalação anterior apenas depois de restaurar com sucesso', async () => {
+  const anterior = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage')
+  const memoria = new Map([['gy:sessao-pendente:v1', 'rascunho anterior']])
+  Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { removeItem: chave => memoria.delete(chave) } })
+  try {
+    const backup = await exportarBackup(adaptador(fixture()), agora)
+    const destino = adaptador({})
+    destino.falhar = true
+    await assert.rejects(restaurarBackup(destino, backup), /falha simulada/)
+    assert.equal(memoria.size, 1)
+    destino.falhar = false
+    await restaurarBackup(destino, backup)
+    assert.equal(memoria.size, 0)
+  } finally {
+    if (anterior) Object.defineProperty(globalThis, 'sessionStorage', anterior)
+    else delete globalThis.sessionStorage
+  }
 })
 
 test('falha de substituição mantém os registros anteriores do adaptador', async () => {

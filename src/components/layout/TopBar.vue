@@ -55,6 +55,8 @@ const headerBgClass = computed(() => {
   return colorMap[currentTab.value.color]
 })
 
+const safeAreaBgClass = computed(() => feedbackVisible.value ? feedbackBg.value : headerBgClass.value)
+
 const activeTabStyles = computed(() => {
   const styles: Record<string, any> = {
     'amethyst': { icon: 'text-amethyst-500', pillBg: 'bg-amethyst-50', pillText: 'text-amethyst-600' },
@@ -78,7 +80,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="relative">
+  <div class="relative pt-[env(safe-area-inset-top)]" :class="safeAreaBgClass">
     <!-- TOPBAR FIXA z-[100] (Protegida do blur de baixo) -->
     <header 
       class="w-full flex flex-col shadow-xl transition-colors duration-500 ease-in-out z-[100] rounded-b-[2.5rem] relative"
