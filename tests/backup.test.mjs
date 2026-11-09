@@ -25,7 +25,8 @@ const fixture = () => ({
     { id: 31, fichaId: 8, treinoId: 14, fichaNome: 'Principal', treinoNome: 'Treino A', fichaFoco: 'Força', fichaCorTema: 'teal', dataInicio: new Date('2026-11-04T10:00:00.000Z'), dataFim: new Date('2026-11-04T11:00:00.000Z'), diaConclusaoLocal: '2026-11-04', fusoConclusao: 'America/Sao_Paulo', offsetConclusaoMinutos: 180, estado: 'finalizado', duracaoMinutos: 60, exerciciosRealizados: [{ exercicioId: 2, nome: 'Supino personalizado', grupoMuscular: 'Peito', ordem: 1, seriesPlanejadas: 1, repsAlvo: '10', pesoBasePlanejado: 25, taxaAumentoKg: 2.5, temDescanso: true, descansoSegundos: 90, seriesRealizadas: [{ numeroDaSerie: 1, peso: 27.5, reps: '10', finalizada: true }] }] },
     { id: 32, fichaId: 8, treinoId: 14, fichaNome: 'Principal', treinoNome: 'Treino A', dataInicio: new Date('2026-11-05T10:00:00.000Z'), dataFim: new Date('2026-11-05T11:00:00.000Z'), estado: 'cancelado', duracaoMinutos: 60, exerciciosRealizados: [] },
     { id: 33, fichaId: 8, treinoId: 14, fichaNome: 'Principal', treinoNome: 'Treino A', dataInicio: new Date('2026-11-08T14:00:00.000Z'), estado: 'em_andamento', duracaoMinutos: 60, exerciciosRealizados: [{ exercicioId: 2, nome: 'Supino personalizado', grupoMuscular: 'Peito', ordem: 1, seriesPlanejadas: 1, repsAlvo: '10', pesoBasePlanejado: 25, taxaAumentoKg: 2.5, temDescanso: true, descansoSegundos: 90, seriesRealizadas: [{ numeroDaSerie: 1, peso: 30, reps: 9, finalizada: false }] }] }
-  ]
+  ],
+  medidasCorporais: [{ id: 4, dataLocal: '2026-11-02', pesoKg: 76, cinturaCm: 82 }]
 })
 
 const copia = valor => structuredClone(valor)
@@ -45,8 +46,9 @@ test('exporta tabelas persistidas, datas, foto, fichas e sessão em andamento', 
   const dbFake = adaptador(fixture())
   const backup = await exportarBackup(dbFake, agora)
   assert.equal(backup.formato, FORMATO_BACKUP)
-  assert.equal(backup.versao, 2)
-  assert.equal(backup.schemaOrigem, 4)
+  assert.equal(backup.versao, 3)
+  assert.equal(backup.schemaOrigem, 5)
+  assert.deepEqual(backup.tabelas.medidasCorporais, fixture().medidasCorporais)
   assert.equal(backup.tabelas.perfil[0].fotoPerfil, fixture().perfil[0].fotoPerfil)
   assert.equal(backup.tabelas.programacoes[0].fusoHorario, 'America/Sao_Paulo')
   assert.equal(backup.tabelas.historico[0].diaConclusaoLocal, '2026-11-04')
@@ -55,6 +57,40 @@ test('exporta tabelas persistidas, datas, foto, fichas e sessão em andamento', 
   assert.equal(resumoBackup(backup).fichas, 2)
   assert.equal(resumoBackup(backup).treinos, 2)
   assert.equal(resumoBackup(backup).exercicios, 2)
+  assert.equal(resumoBackup(backup).medidasCorporais, 1)
+})
+
+test('lê backups v1 e v2 sem medições e os restaura com a tabela nova vazia', async () => {
+  const backupV3 = await exportarBackup(adaptador(fixture()), agora)
+  for (const versao of [1, 2]) {
+    const legado = copia(backupV3)
+    legado.versao = versao
+    delete legado.tabelas.medidasCorporais
+    if (versao === 1) {
+      delete legado.tabelas.catalogo[0].exercicioCanonicoId
+      for (const sessao of legado.tabelas.historico) for (const exercicio of sessao.exerciciosRealizados) {
+        delete exercicio.exercicioCanonicoId
+        delete exercicio.planejado
+        delete exercicio.registrosEditados
+      }
+    }
+    const validado = validarBackup(legado)
+    assert.deepEqual(validado.tabelas.medidasCorporais, [])
+    const destino = adaptador({ perfil: [], catalogo: [], fichas: [], treinos: [], configuracoes: [], programacoes: [], historico: [], medidasCorporais: [] })
+    await restaurarBackup(destino, validado)
+    assert.deepEqual(destino.tabelas.medidasCorporais, [])
+    assert.equal(destino.tabelas.historico.length, fixture().historico.length)
+  }
+})
+
+test('valida medidas corporais e rejeita duas medições na mesma data', async () => {
+  const backup = await exportarBackup(adaptador(fixture()), agora)
+  const medidaInvalida = copia(backup)
+  medidaInvalida.tabelas.medidasCorporais[0].pesoKg = 0
+  assert.throws(() => validarBackup(medidaInvalida), /dados inválidos/)
+  const dataDuplicada = copia(backup)
+  dataDuplicada.tabelas.medidasCorporais.push({ id: 5, dataLocal: '2026-11-02', cinturaCm: 81 })
+  assert.throws(() => validarBackup(dataDuplicada), /dados inválidos/)
 })
 
 test('valida formato, versão, tipos e relacionamentos antes de aceitar o backup', async () => {
@@ -78,7 +114,7 @@ test('valida formato, versão, tipos e relacionamentos antes de aceitar o backup
 test('restaura em substituição, preserva IDs e datas e pode ser repetido sem duplicar', async () => {
   const origem = adaptador(fixture())
   const backup = await exportarBackup(origem, agora)
-  const destino = adaptador({ perfil: [], catalogo: [], fichas: [], treinos: [], configuracoes: [], programacoes: [], historico: [] })
+  const destino = adaptador({ perfil: [], catalogo: [], fichas: [], treinos: [], configuracoes: [], programacoes: [], historico: [], medidasCorporais: [] })
   await restaurarBackup(destino, backup)
   await restaurarBackup(destino, backup)
   assert.deepEqual(destino.tabelas, origem.tabelas)
@@ -87,7 +123,7 @@ test('restaura em substituição, preserva IDs e datas e pode ser repetido sem d
 
 test('falha de substituição mantém os registros anteriores do adaptador', async () => {
   const backup = await exportarBackup(adaptador(fixture()), agora)
-  const anterior = { perfil: [], catalogo: [], fichas: [], treinos: [], configuracoes: [], programacoes: [], historico: [] }
+  const anterior = { perfil: [], catalogo: [], fichas: [], treinos: [], configuracoes: [], programacoes: [], historico: [], medidasCorporais: [] }
   const destino = adaptador(anterior)
   destino.falhar = true
   await assert.rejects(restaurarBackup(destino, backup), /falha simulada/)
@@ -96,7 +132,7 @@ test('falha de substituição mantém os registros anteriores do adaptador', asy
 
 test('preserva a mesma sequência real para os mesmos dados e instante de referência', async () => {
   const backup = await exportarBackup(adaptador(fixture()), agora)
-  const destino = adaptador({ perfil: [], catalogo: [], fichas: [], treinos: [], configuracoes: [], programacoes: [], historico: [] })
+  const destino = adaptador({ perfil: [], catalogo: [], fichas: [], treinos: [], configuracoes: [], programacoes: [], historico: [], medidasCorporais: [] })
   const antes = calcularSequencia(backup.tabelas.programacoes, backup.tabelas.historico, agora)
   await restaurarBackup(destino, backup)
   const depois = calcularSequencia(destino.tabelas.programacoes, destino.tabelas.historico, agora)

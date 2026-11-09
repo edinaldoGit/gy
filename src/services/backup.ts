@@ -1,10 +1,10 @@
-import { db, type ConfiguracaoApp, type ExercicioCatalogo, type Ficha, type HistoricoTreino, type Perfil, type ProgramacaoVigente, type Treino } from '../database/db.ts'
+import { db, type ConfiguracaoApp, type ExercicioCatalogo, type Ficha, type HistoricoTreino, type MedidaCorporal, type Perfil, type ProgramacaoVigente, type Treino } from '../database/db.ts'
 
 import { identidadeValida, identidadeOficial } from '../utils/identidadeExercicio.ts'
 import { exerciciosSeed } from '../data/catalogoOficial.ts'
 
 export const FORMATO_BACKUP = 'gy-backup'
-export const VERSAO_BACKUP = 2
+export const VERSAO_BACKUP = 3
 export const TAMANHO_MAXIMO_BACKUP = 50 * 1024 * 1024
 
 export interface TabelasBackup {
@@ -15,11 +15,12 @@ export interface TabelasBackup {
   configuracoes: ConfiguracaoApp[]
   programacoes: ProgramacaoVigente[]
   historico: HistoricoTreino[]
+  medidasCorporais: MedidaCorporal[]
 }
 
 export interface DocumentoBackup {
   formato: typeof FORMATO_BACKUP
-  versao: 1 | 2
+  versao: 1 | 2 | 3
   criadoEm: string
   schemaOrigem: number
   tabelas: TabelasBackup
@@ -36,6 +37,7 @@ export interface ResumoBackup {
   sessoes: number
   sessaoEmAndamento: boolean
   programacoes: number
+  medidasCorporais: number
 }
 
 export interface AdaptadorBackup {
@@ -46,7 +48,7 @@ export interface AdaptadorBackup {
 const datasPorTabela: Record<keyof TabelasBackup, string[]> = {
   perfil: ['criadoEm'], catalogo: [], fichas: ['criadoEm', 'atualizadoEm'],
   treinos: ['criadoEm', 'atualizadoEm'], configuracoes: [],
-  programacoes: ['efetivaEm'], historico: ['dataInicio', 'dataFim']
+  programacoes: ['efetivaEm'], historico: ['dataInicio', 'dataFim'], medidasCorporais: []
 }
 
 const erros = {
@@ -104,7 +106,8 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
     treinos: ['id', 'fichaId', 'nome', 'foco', 'ordem', 'diasDaSemana', 'exercicios', 'criadoEm', 'atualizadoEm', 'corTema'],
     configuracoes: ['chave', 'fichaAtivaId'],
     programacoes: ['id', 'fichaId', 'efetivaEm', 'diaLocalVigencia', 'fusoHorario', 'offsetMinutos', 'motivo', 'fichaNome', 'treinos'],
-    historico: ['id', 'fichaId', 'treinoId', 'fichaNome', 'treinoNome', 'fichaFoco', 'fichaCorTema', 'dataInicio', 'dataFim', 'diaConclusaoLocal', 'fusoConclusao', 'offsetConclusaoMinutos', 'estado', 'duracaoMinutos', 'exerciciosRealizados']
+    historico: ['id', 'fichaId', 'treinoId', 'fichaNome', 'treinoNome', 'fichaFoco', 'fichaCorTema', 'dataInicio', 'dataFim', 'diaConclusaoLocal', 'fusoConclusao', 'offsetConclusaoMinutos', 'estado', 'duracaoMinutos', 'exerciciosRealizados'],
+    medidasCorporais: ['id', 'dataLocal', 'pesoKg', 'cinturaCm', 'quadrilCm', 'peitoralCm', 'bracoEsquerdoCm', 'bracoDireitoCm', 'coxaEsquerdaCm', 'coxaDireitaCm', 'panturrilhaEsquerdaCm', 'panturrilhaDireitaCm']
   }
   if (versao === 1 && chave === 'catalogo' && r.exercicioCanonicoId !== undefined) throw new ErroBackup(erros.dados)
   chaves(r, permitidos[chave])
@@ -115,7 +118,8 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
     treinos: ['fichaId', 'nome', 'foco', 'ordem', 'diasDaSemana', 'exercicios', 'criadoEm', 'atualizadoEm'],
     configuracoes: ['chave', 'fichaAtivaId'],
     programacoes: ['fichaId', 'efetivaEm', 'motivo', 'fichaNome', 'treinos'],
-    historico: ['fichaId', 'treinoId', 'fichaNome', 'treinoNome', 'dataInicio', 'estado', 'duracaoMinutos', 'exerciciosRealizados']
+    historico: ['fichaId', 'treinoId', 'fichaNome', 'treinoNome', 'dataInicio', 'estado', 'duracaoMinutos', 'exerciciosRealizados'],
+    medidasCorporais: ['dataLocal']
   }
   campos(r, obrigatorios[chave])
   if (chave !== 'configuracoes' && !id(r.id) || r.id !== undefined && !id(r.id)) throw new ErroBackup(erros.dados)
@@ -142,7 +146,7 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
       const t = objeto(item); chaves(t, ['treinoId', 'treinoNome', 'diasDaSemana']); campos(t, ['treinoId', 'treinoNome', 'diasDaSemana'])
       if (!id(t.treinoId) || !texto(t.treinoNome, 200) || !lista(t.diasDaSemana, 7) || !t.diasDaSemana.every(d => numero(d, 0, 6, true)) || new Set(t.diasDaSemana).size !== t.diasDaSemana.length) throw new ErroBackup(erros.dados)
     }
-  } else {
+  } else if (chave === 'historico') {
     if (r.fichaId !== null && !id(r.fichaId) || r.treinoId !== null && !id(r.treinoId) || !texto(r.fichaNome, 200, true) || !texto(r.treinoNome, 200) || r.fichaFoco !== undefined && !texto(r.fichaFoco, 200, true) || r.fichaCorTema !== undefined && !texto(r.fichaCorTema, 80, true) || !data(r.dataInicio) || !data(r.dataFim, true) || r.diaConclusaoLocal !== undefined && !datasCivil(r.diaConclusaoLocal) || r.fusoConclusao !== undefined && !texto(r.fusoConclusao, 100) || r.offsetConclusaoMinutos !== undefined && !numero(r.offsetConclusaoMinutos, -840, 840, true) || !['em_andamento', 'finalizado', 'cancelado'].includes(String(r.estado)) || !numero(r.duracaoMinutos, 0, 1e7) || !lista(r.exerciciosRealizados, 1000)) throw new ErroBackup(erros.dados)
     if (r.estado !== 'em_andamento' && !data(r.dataFim)) throw new ErroBackup(erros.dados)
     for (const item of r.exerciciosRealizados) {
@@ -162,6 +166,9 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
         if (!numero(s.numeroDaSerie, 1, 1000, true) || !numero(s.peso, 0, 10000) || !(numero(s.reps, 0, 10000) || texto(s.reps, 100, true)) || s.finalizada !== undefined && typeof s.finalizada !== 'boolean') throw new ErroBackup(erros.dados)
       }
     }
+  } else {
+    const medidas = ['pesoKg', 'cinturaCm', 'quadrilCm', 'peitoralCm', 'bracoEsquerdoCm', 'bracoDireitoCm', 'coxaEsquerdaCm', 'coxaDireitaCm', 'panturrilhaEsquerdaCm', 'panturrilhaDireitaCm']
+    if (!datasCivil(r.dataLocal) || !medidas.some(campo => r[campo] !== undefined) || medidas.some(campo => r[campo] !== undefined && !numero(r[campo], campo === 'pesoKg' ? 0.1 : 1, campo === 'pesoKg' ? 1000 : 500))) throw new ErroBackup(erros.dados)
   }
   for (const campo of datasPorTabela[chave]) if (!data(r[campo], campo === 'dataFim')) throw new ErroBackup(erros.dados)
 }
@@ -172,18 +179,22 @@ export function validarBackup(entrada: unknown): DocumentoBackup {
     chaves(doc, ['formato', 'versao', 'criadoEm', 'schemaOrigem', 'tabelas'])
     campos(doc, ['formato', 'versao', 'criadoEm', 'schemaOrigem', 'tabelas'])
     if (doc.formato !== FORMATO_BACKUP) throw new ErroBackup(erros.formato)
-    if (doc.versao !== 1 && doc.versao !== VERSAO_BACKUP) throw new ErroBackup(erros.versao)
+    if (doc.versao !== 1 && doc.versao !== 2 && doc.versao !== VERSAO_BACKUP) throw new ErroBackup(erros.versao)
     if (!data(doc.criadoEm) || !numero(doc.schemaOrigem, 1, 1000, true)) throw new ErroBackup(erros.dados)
     const tabelas = objeto(doc.tabelas)
-    const nomes = ['perfil', 'catalogo', 'fichas', 'treinos', 'configuracoes', 'programacoes', 'historico'] as const
-    chaves(tabelas, [...nomes]); campos(tabelas, [...nomes])
-    const limites: Record<keyof TabelasBackup, number> = { perfil: 10, catalogo: 10000, fichas: 500, treinos: 5000, configuracoes: 1, programacoes: 50000, historico: 50000 }
+    const nomesAntigos = ['perfil', 'catalogo', 'fichas', 'treinos', 'configuracoes', 'programacoes', 'historico'] as const
+    const nomes = doc.versao === 3 ? [...nomesAntigos, 'medidasCorporais'] as const : nomesAntigos
+    const tabelaInternaNormalizada = doc.versao < 3 && Array.isArray(tabelas.medidasCorporais) && tabelas.medidasCorporais.length === 0
+    chaves(tabelas, tabelaInternaNormalizada ? [...nomes, 'medidasCorporais'] : [...nomes]); campos(tabelas, [...nomes])
+    const limites: Record<keyof TabelasBackup, number> = { perfil: 10, catalogo: 10000, fichas: 500, treinos: 5000, configuracoes: 1, programacoes: 50000, historico: 50000, medidasCorporais: 50000 }
     for (const nome of nomes) {
       if (!lista(tabelas[nome], limites[nome])) throw new ErroBackup(erros.dados)
       for (const registro of tabelas[nome]) validarRegistro(nome, registro, Number(doc.versao))
       const ids = (tabelas[nome] as Array<{ id?: unknown }>).flatMap(r => r.id === undefined ? [] : [r.id])
       if (!idsUnicos(ids)) throw new ErroBackup(erros.dados)
     }
+    if (doc.versao === 3 && new Set((tabelas.medidasCorporais as MedidaCorporal[]).map(registro => registro.dataLocal)).size !== (tabelas.medidasCorporais as MedidaCorporal[]).length) throw new ErroBackup(erros.dados)
+    if (doc.versao < 3) (tabelas as Record<string, unknown>).medidasCorporais = []
     const dados = tabelas as unknown as TabelasBackup
     const canonicos = new Map<string, string>()
     for (const exercicio of dados.catalogo) {
@@ -197,7 +208,7 @@ export function validarBackup(entrada: unknown): DocumentoBackup {
     const catalogo = new Set(dados.catalogo.flatMap(e => e.id === undefined ? [] : [e.id]))
     if (dados.treinos.some(t => !fichas.has(t.fichaId) || t.exercicios.some(e => !catalogo.has(e.exercicioId) || e.substitutosIds.some(idEx => !catalogo.has(idEx))))) throw new ErroBackup(erros.dados)
     if (dados.configuracoes.length > 1 || dados.configuracoes[0]?.fichaAtivaId != null && !fichas.has(dados.configuracoes[0].fichaAtivaId)) throw new ErroBackup(erros.dados)
-    return doc as unknown as DocumentoBackup
+    return { ...doc, tabelas } as unknown as DocumentoBackup
   } catch (error) {
     if (error instanceof ErroBackup) throw error
     throw new ErroBackup(erros.dados)
@@ -213,7 +224,8 @@ const transformarDatas = (tabelas: TabelasBackup, serializar: boolean) => {
 }
 
 export async function exportarBackup(adaptador: AdaptadorBackup, agora = new Date()): Promise<DocumentoBackup> {
-  const tabelas = await adaptador.lerSnapshot()
+  const snapshot = await adaptador.lerSnapshot()
+  const tabelas = { ...snapshot, medidasCorporais: snapshot.medidasCorporais ?? [] }
   const documento: DocumentoBackup = { formato: FORMATO_BACKUP, versao: VERSAO_BACKUP, criadoEm: agora.toISOString(), schemaOrigem: db.verno, tabelas: transformarDatas(tabelas, true) }
   validarBackup(documento)
   return documento
@@ -234,7 +246,7 @@ export function resumoBackup(documento: DocumentoBackup): ResumoBackup {
     fichas: tabelas.fichas.length, fichaAtiva: tabelas.fichas.find(f => f.id === ativa)?.nome ?? null,
     treinos: tabelas.treinos.length, exercicios: tabelas.treinos.reduce((soma, treino) => soma + treino.exercicios.length, 0),
     sessoes: tabelas.historico.length, sessaoEmAndamento: tabelas.historico.some(s => s.estado === 'em_andamento'),
-    programacoes: tabelas.programacoes.length
+    programacoes: tabelas.programacoes.length, medidasCorporais: tabelas.medidasCorporais.length
   }
 }
 
@@ -245,16 +257,16 @@ export async function restaurarBackup(adaptador: AdaptadorBackup, documento: Doc
 
 export const adaptadorDexie: AdaptadorBackup = {
   async lerSnapshot() {
-    return db.transaction('r', [db.perfil, db.catalogo, db.fichas, db.treinos, db.configuracoes, db.programacoes, db.historico], async () => {
-      const [perfil, catalogo, fichas, treinos, configuracoes, programacoes, historico] = await Promise.all([
-        db.perfil.toArray(), db.catalogo.toArray(), db.fichas.toArray(), db.treinos.toArray(), db.configuracoes.toArray(), db.programacoes.toArray(), db.historico.toArray()
+    return db.transaction('r', [db.perfil, db.catalogo, db.fichas, db.treinos, db.configuracoes, db.programacoes, db.historico, db.medidasCorporais], async () => {
+      const [perfil, catalogo, fichas, treinos, configuracoes, programacoes, historico, medidasCorporais] = await Promise.all([
+        db.perfil.toArray(), db.catalogo.toArray(), db.fichas.toArray(), db.treinos.toArray(), db.configuracoes.toArray(), db.programacoes.toArray(), db.historico.toArray(), db.medidasCorporais.toArray()
       ])
-      return { perfil, catalogo, fichas, treinos, configuracoes, programacoes, historico }
+      return { perfil, catalogo, fichas, treinos, configuracoes, programacoes, historico, medidasCorporais }
     })
   },
   async substituir(tabelas) {
-    await db.transaction('rw', [db.perfil, db.catalogo, db.fichas, db.treinos, db.configuracoes, db.programacoes, db.historico], async () => {
-      await Promise.all([db.perfil.clear(), db.catalogo.clear(), db.fichas.clear(), db.treinos.clear(), db.configuracoes.clear(), db.programacoes.clear(), db.historico.clear()])
+    await db.transaction('rw', [db.perfil, db.catalogo, db.fichas, db.treinos, db.configuracoes, db.programacoes, db.historico, db.medidasCorporais], async () => {
+      await Promise.all([db.perfil.clear(), db.catalogo.clear(), db.fichas.clear(), db.treinos.clear(), db.configuracoes.clear(), db.programacoes.clear(), db.historico.clear(), db.medidasCorporais.clear()])
       if (tabelas.perfil.length) await db.perfil.bulkAdd(tabelas.perfil)
       if (tabelas.catalogo.length) await db.catalogo.bulkAdd(tabelas.catalogo)
       if (tabelas.fichas.length) await db.fichas.bulkAdd(tabelas.fichas)
@@ -262,6 +274,7 @@ export const adaptadorDexie: AdaptadorBackup = {
       if (tabelas.configuracoes.length) await db.configuracoes.bulkPut(tabelas.configuracoes)
       if (tabelas.programacoes.length) await db.programacoes.bulkAdd(tabelas.programacoes)
       if (tabelas.historico.length) await db.historico.bulkAdd(tabelas.historico)
+      if (tabelas.medidasCorporais.length) await db.medidasCorporais.bulkAdd(tabelas.medidasCorporais)
     })
   }
 }

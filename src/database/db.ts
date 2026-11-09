@@ -100,6 +100,21 @@ export interface HistoricoTreino {
   exerciciosRealizados: ExercicioRealizado[];
 }
 
+export interface MedidaCorporal {
+  id?: number;
+  dataLocal: string;
+  pesoKg?: number;
+  cinturaCm?: number;
+  quadrilCm?: number;
+  peitoralCm?: number;
+  bracoEsquerdoCm?: number;
+  bracoDireitoCm?: number;
+  coxaEsquerdaCm?: number;
+  coxaDireitaCm?: number;
+  panturrilhaEsquerdaCm?: number;
+  panturrilhaDireitaCm?: number;
+}
+
 export interface ExercicioRealizado {
   exercicioId: number;
   exercicioCanonicoId?: string;
@@ -143,6 +158,7 @@ export class GyDB extends Dexie {
   configuracoes!: Table<ConfiguracaoApp, string>;
   programacoes!: Table<ProgramacaoVigente, number>;
   historico!: Table<HistoricoTreino, number>;
+  medidasCorporais!: Table<MedidaCorporal, number>;
 
   constructor() {
     super('GyDB');
@@ -160,6 +176,16 @@ export class GyDB extends Dexie {
       configuracoes: '&chave',
       programacoes: '++id, fichaId, efetivaEm',
       historico: '++id, fichaId, treinoId, dataFim, estado, dataInicio'
+    });
+    this.version(5).stores({
+      perfil: '++id',
+      catalogo: '++id, grupoMuscular',
+      fichas: '++id, origem, atualizadoEm',
+      treinos: '++id, fichaId, ordem, *diasDaSemana',
+      configuracoes: '&chave',
+      programacoes: '++id, fichaId, efetivaEm',
+      historico: '++id, fichaId, treinoId, dataFim, estado, dataInicio',
+      medidasCorporais: '++id, &dataLocal'
     });
   }
 }

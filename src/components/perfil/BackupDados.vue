@@ -131,6 +131,7 @@ const dataArquivo = (data: Date) => new Intl.DateTimeFormat('pt-BR', { dateStyle
         <div><dt class="text-xs text-whitesmoke-500">Treinos e exercícios</dt><dd class="font-semibold text-whitesmoke-800">{{ resumo()!.treinos }} · {{ resumo()!.exercicios }} exercícios</dd></div>
         <div><dt class="text-xs text-whitesmoke-500">Sessões históricas</dt><dd class="font-semibold text-whitesmoke-800">{{ resumo()!.sessoes }}</dd></div>
         <div><dt class="text-xs text-whitesmoke-500">Programações históricas</dt><dd class="font-semibold text-whitesmoke-800">{{ resumo()!.programacoes }}</dd></div>
+        <div><dt class="text-xs text-whitesmoke-500">Registros corporais</dt><dd class="font-semibold text-whitesmoke-800">{{ resumo()!.medidasCorporais }}</dd></div>
         <div v-if="resumo()!.sessaoEmAndamento" class="col-span-2 rounded-xl bg-amber-50 p-2 text-xs font-semibold text-amber-800">Este backup inclui uma sessão em andamento, que poderá ser retomada.</div>
       </dl>
       <p class="mt-4 rounded-xl bg-bubblegum-50 p-3 text-xs leading-relaxed text-bubblegum-800">Restaurar este backup substituirá os dados atuais do Gy neste dispositivo. Essa operação não poderá ser desfeita sem uma cópia dos dados anteriores.</p>

@@ -147,18 +147,20 @@ test('compartilhamento v3 conserva identidade, aceita v2 e não incorpora substi
   assert.equal(validarDocumentoFichas(v2).exercicios[0].nome,deck.nome)
 })
 
-test('backup v2 preserva substituição e histórico global; v1 continua aceito', async () => {
+test('backup v3 preserva substituição e histórico global; v1 e v2 continuam aceitos', async () => {
   const ex=realizado(trocarExercicio(slot(),polia))
   const tabelas={perfil:[],catalogo:cat,fichas:[],treinos:[],configuracoes:[],programacoes:[],historico:[sessao(1,'2026-11-09T15:00:00Z',ex)]}
   let recuperado
   const backup=await exportarBackup({lerSnapshot:async()=>tabelas,substituir:async()=>{}},agora)
-  assert.equal(backup.versao,2)
+  assert.equal(backup.versao,3)
   await restaurarBackup({lerSnapshot:async()=>tabelas,substituir:async t=>{recuperado=t}},backup)
-  assert.deepEqual(recuperado,tabelas)
+  assert.deepEqual(recuperado,{...tabelas,medidasCorporais:[]})
   assert.equal(execucoesDoExercicio(recuperado.historico,recuperado.catalogo,polia.exercicioCanonicoId,agora)[0].series.length,3)
   assert.deepEqual(calcularSequencia(recuperado.programacoes,recuperado.historico,agora),calcularSequencia(tabelas.programacoes,tabelas.historico,agora))
   const v1=structuredClone(backup);v1.versao=1;v1.tabelas.catalogo.forEach(e=>delete e.exercicioCanonicoId);v1.tabelas.historico.forEach(s=>s.exerciciosRealizados.forEach(e=>{delete e.exercicioCanonicoId;delete e.planejado;delete e.registrosEditados}))
   assert.equal(validarBackup(v1).versao,1)
+  const v2=structuredClone(backup);v2.versao=2;delete v2.tabelas.medidasCorporais
+  assert.deepEqual(validarBackup(v2).tabelas.medidasCorporais,[])
   const identidadeExecutadaIncorreta=structuredClone(backup)
   identidadeExecutadaIncorreta.tabelas.historico[0].exerciciosRealizados[0].exercicioCanonicoId='gy:oficial:24'
   assert.throws(()=>validarBackup(identidadeExecutadaIncorreta),/dados inválidos/)

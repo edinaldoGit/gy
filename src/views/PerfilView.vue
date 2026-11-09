@@ -4,14 +4,16 @@ import { confirmation } from '@/composables/useConfirm'
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { db, type Perfil } from '@/database/db'
-import { UserRound, Ruler, Weight, CalendarDays, Activity, Trash2 } from 'lucide-vue-next'
+import { UserRound, Ruler, Weight, CalendarDays, Activity, Trash2, ChartNoAxesCombined } from 'lucide-vue-next'
 import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
 import BackupDados from '@/components/perfil/BackupDados.vue'
 import { comGravacaoGy } from '@/database/writeLock'
+import EvolucaoCorporal from '@/components/perfil/EvolucaoCorporal.vue'
 
 const router = useRouter()
 const usuario = ref<Perfil | null>(null)
 const carregandoPerfil = ref(true)
+const mostrarEvolucao = ref(false)
 
 onMounted(async () => {
   try { usuario.value = await db.perfil.toCollection().first() ?? null }
@@ -46,7 +48,9 @@ const apagarDados = async () => {
 </script>
 
 <template>
-  <div v-if="usuario" class="flex flex-col gap-6 pb-20 animate-in fade-in duration-500">
+  <EvolucaoCorporal v-if="usuario && mostrarEvolucao" @voltar="mostrarEvolucao = false" />
+
+  <div v-else-if="usuario" class="flex flex-col gap-6 pb-20 animate-in fade-in duration-500">
     <SectionPageHeader titulo="Meu Perfil" subtitulo="Seus dados e evolução" tema="perfil" />
     
     <div class="flex flex-col items-center mt-4">
@@ -118,6 +122,12 @@ const apagarDados = async () => {
     </div>
 
     <BackupDados />
+
+    <button type="button" class="group flex w-full items-center gap-4 rounded-3xl border border-bubblegum-100 bg-white p-4 text-left shadow-sm transition hover:border-bubblegum-300 hover:bg-bubblegum-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bubblegum-600 sm:p-5" @click="mostrarEvolucao = true">
+      <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-bubblegum-50 text-bubblegum-600 transition group-hover:bg-bubblegum-100"><ChartNoAxesCombined :size="23" /></span>
+      <span class="min-w-0 flex-1"><span class="block font-black text-whitesmoke-950">Evolução corporal</span><span class="mt-0.5 block text-sm text-whitesmoke-500">Registre peso e medidas ao longo do tempo</span></span>
+      <span class="text-sm font-bold text-bubblegum-600">Abrir</span>
+    </button>
 
     <div class="mt-4">
       <button 
