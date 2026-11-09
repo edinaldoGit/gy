@@ -80,7 +80,8 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="relative pt-[env(safe-area-inset-top)]" :class="safeAreaBgClass">
+  <div class="relative pt-[env(safe-area-inset-top)]">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 h-[env(safe-area-inset-top)] transition-colors duration-500 ease-in-out" :class="safeAreaBgClass"></div>
     <!-- TOPBAR FIXA z-[100] (Protegida do blur de baixo) -->
     <header 
       class="w-full flex flex-col shadow-xl transition-colors duration-500 ease-in-out z-[100] rounded-b-[2.5rem] relative"
@@ -91,10 +92,10 @@ onMounted(async () => {
         
         <!-- Esquerda: Perfil + Ofensiva -->
         <div class="flex items-center flex-1 justify-start">
-          <div class="w-14 h-14 rounded-full bg-whitesmoke-50/20 flex items-center justify-center overflow-hidden border-[2px] border-whitesmoke-50 shadow-sm relative z-10 shrink-0 transition-all duration-300"
+          <div class="w-14 h-14 rounded-full bg-whitesmoke-50 flex items-center justify-center overflow-hidden border-[2px] border-whitesmoke-50 shadow-sm relative z-10 shrink-0 transition-all duration-300"
                :class="{'ring-4 ring-whitesmoke-50/30': isWorkoutActive}">
             <img v-if="fotoUsuario" :src="fotoUsuario" class="w-full h-full object-cover" />
-            <UserRound v-else :size="28" class="text-whitesmoke-50" />
+            <UserRound v-else :size="28" :class="activeTabStyles.icon" />
           </div>
           
           <div role="status" :aria-label="sequencia.erro.value ? 'Sequência indisponível. Tente reabrir o aplicativo.' : `Sequência de ${streakDays} dias programados: ${fogoAtivo ? 'fogo ativo' : 'congelada'}`" class="h-9 flex items-center pl-6 pr-4 -ml-5 rounded-r-full bg-whitesmoke-50 relative z-0 shadow-sm">
