@@ -53,6 +53,8 @@ watch([() => route.path, feedback.current, () => !!state.value.options], ([path,
   const secao = path === '/fichas' ? 'fichas' : path === '/historico' ? 'historico' : path === '/perfil' ? 'perfil' : path === '/evolucao' ? 'evolucao' : path === '/onboarding' ? 'onboarding' : 'treino'
   meta.content = mensagem ? coresFeedback[mensagem.kind] ?? coresSistema[secao] : coresSistema[secao]
   document.documentElement.style.setProperty('--gy-system-color', meta.content)
+  document.documentElement.style.backgroundColor = meta.content
+  document.body.style.backgroundColor = meta.content
 }, { immediate: true })
 watch(modalAberto, aberto => feedback.pause('modal', aberto))
 const visibility = () => feedback.pause('hidden', document.hidden)
@@ -92,7 +94,7 @@ onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwa
 </script>
 
 <template>
-  <div class="flex h-dvh flex-col overflow-hidden bg-whitesmoke-50">
+  <div class="flex h-dvh flex-col overflow-hidden" style="background-color: var(--gy-system-color)">
     
     <div v-if="route.name !== 'Onboarding'" class="relative z-[100] shrink-0" :inert="modalAberto || !!state.options || restauracaoBloqueada"><TopBar /></div>
 

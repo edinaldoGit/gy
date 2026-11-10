@@ -131,3 +131,10 @@ Instalação física Android/iOS, teclado virtual, captura pela câmera e cor na
 A revisão final passou em `npm test` (121 testes), `npm run build` e dez jornadas com IndexedDB real. A produção local em `127.0.0.1:5195/gy/` serviu os 51 arquivos do artefato por HTTP 200. Depois de desligar o servidor, o service worker permitiu recarregar Perfil, abrir Evolução corporal, salvar uma medição, refletir o peso no Perfil e exportar/restaurar um backup v4 pela interface. Isso simula indisponibilidade da origem local, sem afirmar que a rede física do computador foi desligada.
 
 A versão 0.1.0 mantém a atualização controlada da Etapa 12C. O commit de implementação `7419aff` foi enviado para `main`. O workflow [42728722066](https://github.com/edinaldoGit/gy/actions/runs/42728722066) concluiu testes, build e publicação com sucesso. A conferência pública em 09/11/2026 confirmou HTTP 200 na página principal, em Fichas, Histórico, Evolução e Perfil, no manifesto e no service worker; o JavaScript publicado contém a versão 0.1.0. Treino corresponde à rota principal `/gy/`, e não a `/gy/treino/`. Endereço publicado: https://edinaldogit.github.io/gy/. `git diff --check` também passou. Nenhuma pendência de publicação permanece; as limitações de homologação em dispositivos físicos estão descritas acima.
+
+
+## Ajuste 0.1.1 — área de gestos
+
+O contêiner principal deixa de pintar branco atrás da área inferior e usa a mesma cor dinâmica da TopBar. A sincronização também aplica a cor explicitamente nos fundos de `html` e `body`, além de `theme-color`, da variável CSS e da faixa de safe area existente. O conteúdo permanece claro e o espaço reservado à área segura é preservado. Feedbacks acompanham a mesma cor transitória da TopBar. Não há alteração da estratégia de atualização ou dos dados.
+
+A cor da área de gestos é solicitada pelas superfícies web disponíveis; a decisão final continua pertencendo ao navegador e ao sistema operacional. Referências: https://developer.chrome.com/docs/css-ui/edge-to-edge e https://webkit.org/blog/7929/designing-websites-for-iphone-x/. A barra nativa deve ser conferida em aparelho físico; uma viewport de desktop não a reproduz.
