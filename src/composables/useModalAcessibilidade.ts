@@ -14,10 +14,10 @@ export function useModalAcessibilidade() {
     aberto.value = !!painel
     if (painel) {
       if (!painel.hasAttribute('tabindex')) painel.tabIndex = -1
-      if (!painel.contains(document.activeElement)) (focaveis()[0] ?? painel).focus()
+      if (!painel.contains(document.activeElement)) (focaveis()[0] ?? painel).focus({ preventScroll: true })
     } else {
       const destino = anterior?.isConnected && !anterior.closest('[inert]') ? anterior : document.querySelector<HTMLElement>('main')
-      queueMicrotask(() => destino?.focus())
+      queueMicrotask(() => destino?.focus({ preventScroll: true }))
       anterior = null
     }
   }
@@ -30,7 +30,7 @@ export function useModalAcessibilidade() {
     else if (!evento.shiftKey && document.activeElement === ultimo) { evento.preventDefault(); primeiro.focus() }
   }
   const foco = (evento: FocusEvent) => {
-    if (painel && evento.target instanceof Node && !painel.contains(evento.target)) (focaveis()[0] ?? painel).focus()
+    if (painel && evento.target instanceof Node && !painel.contains(evento.target)) (focaveis()[0] ?? painel).focus({ preventScroll: true })
   }
   onMounted(() => {
     observer = new MutationObserver(atualizar)

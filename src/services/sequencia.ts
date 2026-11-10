@@ -2,11 +2,14 @@ import { liveQuery } from 'dexie'
 import { shallowRef } from 'vue'
 import { db } from '@/database/db'
 import { snapshotProgramacao } from '@/utils/programacao'
-import { calcularSequencia, EstadoSequencia, feedbackDaSequencia } from '@/utils/sequencia'
+import { calcularFoguinho, calcularSequencia, EstadoSequencia, feedbackDaSequencia } from '@/utils/sequencia'
 import { comGravacaoGy } from '@/database/writeLock'
 
 const dominio = new EstadoSequencia()
-const estado = shallowRef(dominio.recalcular())
+let programacoesAtuais: Awaited<ReturnType<typeof ler>>['programacoes'] = []
+let sessoesAtuais: Awaited<ReturnType<typeof ler>>['sessoes'] = []
+const combinarEstado = () => ({ ...dominio.recalcular(), ...calcularFoguinho(programacoesAtuais, sessoesAtuais, new Date()) })
+const estado = shallowRef(combinarEstado())
 const erro = shallowRef(false)
 const ler = () => db.transaction('r', db.programacoes, db.historico, async () => {
   const [programacoes, sessoes] = await Promise.all([
@@ -15,7 +18,10 @@ const ler = () => db.transaction('r', db.programacoes, db.historico, async () =>
   return { programacoes, sessoes }
 })
 const aplicar = (dados: Awaited<ReturnType<typeof ler>>) => {
-  estado.value = dominio.atualizar(dados.programacoes, dados.sessoes)
+  programacoesAtuais = dados.programacoes
+  sessoesAtuais = dados.sessoes
+  dominio.atualizar(programacoesAtuais, sessoesAtuais)
+  estado.value = combinarEstado()
   erro.value = false
 }
 const recarregar = async () => {
@@ -38,7 +44,7 @@ const iniciar = () => {
   let encerrado = false
   let timeout: ReturnType<typeof setTimeout> | undefined
   const atualizarTempo = () => {
-    estado.value = dominio.recalcular()
+    estado.value = combinarEstado()
     clearTimeout(timeout)
     const agora = new Date()
     const meiaNoite = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1)

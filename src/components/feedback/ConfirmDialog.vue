@@ -11,15 +11,15 @@ watch(() => state.value.options, async (options, old) => {
   if (options && !old) {
     previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
     await nextTick()
-    panel.value?.querySelector<HTMLButtonElement>('button')?.focus()
+    panel.value?.querySelector<HTMLButtonElement>('button')?.focus({ preventScroll: true })
   } else if (!options && old) {
     await nextTick()
-    if (previous?.isConnected) previous.focus()
-    else document.querySelector<HTMLElement>('main')?.focus()
+    if (previous?.isConnected) previous.focus({ preventScroll: true })
+    else document.querySelector<HTMLElement>('main')?.focus({ preventScroll: true })
     previous = null
   }
 })
-watch(() => state.value.busy, async busy => { if (busy) { await nextTick(); panel.value?.focus() } })
+watch(() => state.value.busy, async busy => { if (busy) { await nextTick(); panel.value?.focus({ preventScroll: true }) } })
 const keyboard = (event: KeyboardEvent) => {
   if (event.key === 'Escape') { event.preventDefault(); confirmation.cancel() }
   if (event.key !== 'Tab' || !panel.value) return
@@ -33,7 +33,7 @@ onBeforeUnmount(() => { confirmation.cancel() })
 </script>
 <template>
   <Transition name="confirm" :duration="{ enter: 400, leave: 280 }">
-    <div v-if="state.options" class="absolute inset-0 z-[200] flex items-end justify-center overflow-y-auto bg-whitesmoke-950/25 backdrop-blur-sm sm:items-center sm:p-6" @keydown="keyboard">
+    <div v-if="state.options" class="gy-modal-backdrop absolute inset-0 z-[200] flex items-end justify-center sm:items-center sm:p-6" style="--gy-modal-opacity: .25" @keydown="keyboard">
       <section ref="panel" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-description" :aria-busy="state.busy" tabindex="-1" class="gy-modal-height w-full overflow-y-auto rounded-t-[2.5rem] bg-white p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] shadow-xl outline-none sm:max-w-md sm:rounded-[2rem]">
         <span class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl" :class="tones[state.options.variant || 'info'].icon"><component :is="icons[state.options.icon || 'warning']" :size="27" /></span>
         <h2 id="confirm-title" class="text-center text-xl font-black text-whitesmoke-950">{{ state.options.title }}</h2>

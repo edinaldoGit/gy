@@ -120,6 +120,21 @@
 }
 
 
+.gy-modal-backdrop {
+  isolation: isolate;
+}
+
+.gy-modal-backdrop::before {
+  content: '';
+  position: absolute;
+  inset: calc(-1 * var(--gy-topbar-height, 0px)) 0 0;
+  z-index: -1;
+  background-color: color-mix(in srgb, var(--color-whitesmoke-950) calc(var(--gy-modal-opacity, .2) * 100%), transparent);
+  -webkit-backdrop-filter: blur(var(--gy-modal-blur, 8px));
+  backdrop-filter: blur(var(--gy-modal-blur, 8px));
+  pointer-events: none;
+}
+
 .gy-modal-height {
   max-height: min(85dvh, max(0px, calc(100cqh - 2rem)));
 }
