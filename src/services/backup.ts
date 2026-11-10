@@ -5,7 +5,7 @@ import { exerciciosSeed } from '../data/catalogoOficial.ts'
 import { CHAVE_RASCUNHO_SESSAO } from '../utils/exercicioSessao.ts'
 
 export const FORMATO_BACKUP = 'gy-backup'
-export const VERSAO_BACKUP = 3
+export const VERSAO_BACKUP = 4
 export const TAMANHO_MAXIMO_BACKUP = 50 * 1024 * 1024
 
 export interface TabelasBackup {
@@ -21,7 +21,7 @@ export interface TabelasBackup {
 
 export interface DocumentoBackup {
   formato: typeof FORMATO_BACKUP
-  versao: 1 | 2 | 3
+  versao: 1 | 2 | 3 | 4
   criadoEm: string
   schemaOrigem: number
   tabelas: TabelasBackup
@@ -106,7 +106,7 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
     fichas: ['id', 'nome', 'foco', 'corTema', 'descricao', 'origem', 'criadoEm', 'atualizadoEm'],
     treinos: ['id', 'fichaId', 'nome', 'foco', 'ordem', 'diasDaSemana', 'exercicios', 'criadoEm', 'atualizadoEm', 'corTema'],
     configuracoes: ['chave', 'fichaAtivaId'],
-    programacoes: ['id', 'fichaId', 'efetivaEm', 'diaLocalVigencia', 'fusoHorario', 'offsetMinutos', 'motivo', 'fichaNome', 'treinos'],
+    programacoes: ['id', 'fichaId', 'efetivaEm', 'diaLocalVigencia', 'fusoHorario', 'offsetMinutos', 'motivo', 'fichaNome', 'treinos', 'agenda'],
     historico: ['id', 'fichaId', 'treinoId', 'fichaNome', 'treinoNome', 'fichaFoco', 'fichaCorTema', 'dataInicio', 'dataFim', 'diaConclusaoLocal', 'fusoConclusao', 'offsetConclusaoMinutos', 'estado', 'duracaoMinutos', 'exerciciosRealizados'],
     medidasCorporais: ['id', 'dataLocal', 'pesoKg', 'cinturaCm', 'quadrilCm', 'peitoralCm', 'bracoEsquerdoCm', 'bracoDireitoCm', 'coxaEsquerdaCm', 'coxaDireitaCm', 'panturrilhaEsquerdaCm', 'panturrilhaDireitaCm']
   }
@@ -142,11 +142,24 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
   } else if (chave === 'configuracoes') {
     if (r.chave !== 'principal' || r.fichaAtivaId !== null && !id(r.fichaAtivaId)) throw new ErroBackup(erros.dados)
   } else if (chave === 'programacoes') {
-    if (r.fichaId !== null && !id(r.fichaId) || !data(r.efetivaEm) || !['ativacao', 'troca', 'edicao', 'desativacao'].includes(String(r.motivo)) || r.fichaNome !== null && !texto(r.fichaNome, 200) || !lista(r.treinos, 1000) || r.diaLocalVigencia !== undefined && !datasCivil(r.diaLocalVigencia) || r.fusoHorario !== undefined && !texto(r.fusoHorario, 100) || r.offsetMinutos !== undefined && !numero(r.offsetMinutos, -840, 840, true)) throw new ErroBackup(erros.dados)
+    if (r.fichaId !== null && !id(r.fichaId) || !data(r.efetivaEm) || !['ativacao', 'troca', 'edicao', 'desativacao', ...(versao >= 4 ? ['deslocamento'] : [])].includes(String(r.motivo)) || r.fichaNome !== null && !texto(r.fichaNome, 200) || !lista(r.treinos, 1000) || r.diaLocalVigencia !== undefined && !datasCivil(r.diaLocalVigencia) || r.fusoHorario !== undefined && !texto(r.fusoHorario, 100) || r.offsetMinutos !== undefined && !numero(r.offsetMinutos, -840, 840, true)) throw new ErroBackup(erros.dados)
     for (const item of r.treinos) {
       const t = objeto(item); chaves(t, ['treinoId', 'treinoNome', 'diasDaSemana']); campos(t, ['treinoId', 'treinoNome', 'diasDaSemana'])
       if (!id(t.treinoId) || !texto(t.treinoNome, 200) || !lista(t.diasDaSemana, 7) || !t.diasDaSemana.every(d => numero(d, 0, 6, true)) || new Set(t.diasDaSemana).size !== t.diasDaSemana.length) throw new ErroBackup(erros.dados)
     }
+    if (r.agenda !== undefined) {
+      if (versao < 4 || r.motivo !== 'deslocamento') throw new ErroBackup(erros.dados)
+      const agenda = objeto(r.agenda)
+      chaves(agenda, ['inicio', 'fim', 'itens']); campos(agenda, ['inicio', 'fim', 'itens'])
+      if (!datasCivil(agenda.inicio) || !datasCivil(agenda.fim) || String(agenda.fim) < String(agenda.inicio) || agenda.inicio !== r.diaLocalVigencia || !lista(agenda.itens, 28) || !agenda.itens.length) throw new ErroBackup(erros.dados)
+      if ((Date.parse(`${agenda.fim}T00:00:00Z`) - Date.parse(`${agenda.inicio}T00:00:00Z`)) / 86400000 > 35) throw new ErroBackup(erros.dados)
+      const dias = new Set<string>()
+      for (const item of agenda.itens) {
+        const a = objeto(item); chaves(a, ['dia', 'treinoId', 'treinoNome']); campos(a, ['dia', 'treinoId', 'treinoNome'])
+        if (!datasCivil(a.dia) || String(a.dia) < String(agenda.inicio) || String(a.dia) > String(agenda.fim) || dias.has(String(a.dia)) || !id(a.treinoId) || !texto(a.treinoNome, 200) || !r.treinos.some(item => objeto(item).treinoId === a.treinoId)) throw new ErroBackup(erros.dados)
+        dias.add(String(a.dia))
+      }
+    } else if (r.motivo === 'deslocamento') throw new ErroBackup(erros.dados)
   } else if (chave === 'historico') {
     if (r.fichaId !== null && !id(r.fichaId) || r.treinoId !== null && !id(r.treinoId) || !texto(r.fichaNome, 200, true) || !texto(r.treinoNome, 200) || r.fichaFoco !== undefined && !texto(r.fichaFoco, 200, true) || r.fichaCorTema !== undefined && !texto(r.fichaCorTema, 80, true) || !data(r.dataInicio) || !data(r.dataFim, true) || r.diaConclusaoLocal !== undefined && !datasCivil(r.diaConclusaoLocal) || r.fusoConclusao !== undefined && !texto(r.fusoConclusao, 100) || r.offsetConclusaoMinutos !== undefined && !numero(r.offsetConclusaoMinutos, -840, 840, true) || !['em_andamento', 'finalizado', 'cancelado'].includes(String(r.estado)) || !numero(r.duracaoMinutos, 0, 1e7) || !lista(r.exerciciosRealizados, 1000)) throw new ErroBackup(erros.dados)
     if (r.estado !== 'em_andamento' && !data(r.dataFim)) throw new ErroBackup(erros.dados)
@@ -180,11 +193,11 @@ export function validarBackup(entrada: unknown): DocumentoBackup {
     chaves(doc, ['formato', 'versao', 'criadoEm', 'schemaOrigem', 'tabelas'])
     campos(doc, ['formato', 'versao', 'criadoEm', 'schemaOrigem', 'tabelas'])
     if (doc.formato !== FORMATO_BACKUP) throw new ErroBackup(erros.formato)
-    if (doc.versao !== 1 && doc.versao !== 2 && doc.versao !== VERSAO_BACKUP) throw new ErroBackup(erros.versao)
+    if (doc.versao !== 1 && doc.versao !== 2 && doc.versao !== 3 && doc.versao !== VERSAO_BACKUP) throw new ErroBackup(erros.versao)
     if (!data(doc.criadoEm) || !numero(doc.schemaOrigem, 1, 1000, true)) throw new ErroBackup(erros.dados)
     const tabelas = objeto(doc.tabelas)
     const nomesAntigos = ['perfil', 'catalogo', 'fichas', 'treinos', 'configuracoes', 'programacoes', 'historico'] as const
-    const nomes = doc.versao === 3 ? [...nomesAntigos, 'medidasCorporais'] as const : nomesAntigos
+    const nomes = doc.versao >= 3 ? [...nomesAntigos, 'medidasCorporais'] as const : nomesAntigos
     const tabelaInternaNormalizada = doc.versao < 3 && Array.isArray(tabelas.medidasCorporais) && tabelas.medidasCorporais.length === 0
     chaves(tabelas, tabelaInternaNormalizada ? [...nomes, 'medidasCorporais'] : [...nomes]); campos(tabelas, [...nomes])
     const limites: Record<keyof TabelasBackup, number> = { perfil: 10, catalogo: 10000, fichas: 500, treinos: 5000, configuracoes: 1, programacoes: 50000, historico: 50000, medidasCorporais: 50000 }
@@ -194,7 +207,7 @@ export function validarBackup(entrada: unknown): DocumentoBackup {
       const ids = (tabelas[nome] as Array<{ id?: unknown }>).flatMap(r => r.id === undefined ? [] : [r.id])
       if (!idsUnicos(ids)) throw new ErroBackup(erros.dados)
     }
-    if (doc.versao === 3 && new Set((tabelas.medidasCorporais as MedidaCorporal[]).map(registro => registro.dataLocal)).size !== (tabelas.medidasCorporais as MedidaCorporal[]).length) throw new ErroBackup(erros.dados)
+    if (doc.versao >= 3 && new Set((tabelas.medidasCorporais as MedidaCorporal[]).map(registro => registro.dataLocal)).size !== (tabelas.medidasCorporais as MedidaCorporal[]).length) throw new ErroBackup(erros.dados)
     if (doc.versao < 3) (tabelas as Record<string, unknown>).medidasCorporais = []
     const dados = tabelas as unknown as TabelasBackup
     const canonicos = new Map<string, string>()
@@ -209,6 +222,8 @@ export function validarBackup(entrada: unknown): DocumentoBackup {
     const catalogo = new Set(dados.catalogo.flatMap(e => e.id === undefined ? [] : [e.id]))
     if (dados.treinos.some(t => !fichas.has(t.fichaId) || t.exercicios.some(e => !catalogo.has(e.exercicioId) || e.substitutosIds.some(idEx => !catalogo.has(idEx))))) throw new ErroBackup(erros.dados)
     if (dados.configuracoes.length > 1 || dados.configuracoes[0]?.fichaAtivaId != null && !fichas.has(dados.configuracoes[0].fichaAtivaId)) throw new ErroBackup(erros.dados)
+    const vigente = [...dados.programacoes].sort((a, b) => new Date(a.efetivaEm).getTime() - new Date(b.efetivaEm).getTime() || (a.id ?? 0) - (b.id ?? 0)).at(-1)
+    if (vigente?.agenda && vigente.fichaId === dados.configuracoes[0]?.fichaAtivaId && vigente.agenda.itens.some(item => !dados.treinos.some(treino => treino.id === item.treinoId && treino.fichaId === vigente.fichaId))) throw new ErroBackup(erros.dados)
     return { ...doc, tabelas } as unknown as DocumentoBackup
   } catch (error) {
     if (error instanceof ErroBackup) throw error

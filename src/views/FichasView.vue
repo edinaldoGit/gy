@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { feedback } from '@/composables/useFeedback'
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFichaStore } from '@/stores/fichaStore'
 
@@ -12,6 +13,8 @@ import FichaWizardAjustes from '@/components/fichas/FichaWizardAjustes.vue'
 import CriarExercicioModal from '@/components/fichas/CriarExercicioModal.vue'
 
 const store = useFichaStore()
+const route = useRoute()
+watch(() => route.hash, hash => { if (hash.startsWith('#gy-ficha=')) store.modo = 'lista' }, { immediate: true })
 const { modo, modalCriarExAberto } = storeToRefs(store)
 
 onMounted(() => {

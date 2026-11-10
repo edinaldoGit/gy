@@ -22,6 +22,7 @@ const routes = [
     name: 'Historico',
     component: () => import('@/views/HistoricoView.vue')
   },
+  { path: '/evolucao', name: 'Evolucao', component: () => import('@/views/EvolucaoView.vue') },
   {
     path: '/perfil',
     name: 'Perfil',
@@ -34,8 +35,12 @@ export const router = createRouter({
   routes
 })
 
+let acessoPorCompartilhamento = false
 router.beforeEach(async (to, _from, next) => {
-  if (to.path === '/onboarding' || to.path === '/perfil') {
+  const caminho = to.path.replace(/\/$/, '') || '/'
+  if (caminho === '/fichas' && to.hash.startsWith('#gy-ficha=')) acessoPorCompartilhamento = true
+  if (caminho !== '/fichas') acessoPorCompartilhamento = false
+  if (caminho === '/onboarding' || caminho === '/perfil' || caminho === '/fichas' && acessoPorCompartilhamento) {
     next()
     return
   }

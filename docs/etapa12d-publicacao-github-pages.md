@@ -4,9 +4,9 @@
 
 O workflow `.github/workflows/deploy.yml` está na branch `main` e executa em pushes para `main` ou por acionamento manual. O job só publica quando a referência é `main`; pull requests e outras branches não disparam publicação automática e uma execução manual em outra branch é ignorada.
 
-A primeira execução, para o commit `5bf488c95b4610416acd9534fe33580bf4cdaf44`, passou por instalação, testes, build e preparação das rotas, mas falhou em **Configure GitHub Pages** porque ainda não existe um site Pages configurado para o repositório. A [execução do GitHub Actions](https://github.com/edinaldoGit/gy/actions/runs/42573039572) registrou `Not Found` nesse passo. A API pública de Pages retornou HTTP 404 e `https://edinaldogit.github.io/gy/` também retornou HTTP 404; portanto, o Gy ainda não está publicado.
+A primeira tentativa do commit `5bf488c95b4610416acd9534fe33580bf4cdaf44` passou por instalação, testes, build e rotas, mas falhou em **Configure GitHub Pages**. Na conferência da Etapa 13, a [mesma execução, reexecutada](https://github.com/edinaldoGit/gy/actions/runs/42573039572), já estava concluída com sucesso, e `https://edinaldogit.github.io/gy/` respondeu HTTP 200. O bloqueio anterior foi resolvido no repositório; a configuração remota não foi alterada pela Etapa 13.
 
-A configuração remota não pôde ser aplicada nesta execução: a conexão GitHub disponível informa permissões `push: false` e `admin: false`. A CLI `gh` não está instalada. A criação do site Pages exige permissão de administração, manutenção ou gerenciamento das configurações do Pages, conforme a [documentação da API do GitHub](https://docs.github.com/en/rest/pages/pages#create-a-github-pages-site). O proprietário precisa selecionar **GitHub Actions** em **Settings → Pages → Build and deployment → Source**. Depois disso, o push existente em `main` pode ser republicado pelo botão **Re-run all jobs** na execução acima, ou acionando **Run workflow** na branch `main`.
+A conexão GitHub gerenciada continua com `push: false` e `admin: false`, e a CLI `gh` não está instalada. Isso descreve essa conexão, não necessariamente outras credenciais legítimas do Git local. A consulta anônima à API de configuração Pages retorna 404 e não serve, isoladamente, para afirmar que o site não existe: a URL pública e o resultado do deploy confirmam a publicação anterior.
 
 ## O que o workflow faz
 
@@ -22,13 +22,13 @@ Como o GitHub Pages não oferece fallback de SPA para rotas diretas, `scripts/pr
 
 O service worker permanece sob o escopo `/gy/`. O Workbox mantém o fallback de navegação para o `index.html` principal e precacheia os arquivos estáticos do build. As cópias de entrada por rota não contêm dados pessoais; perfil, fichas, sessões e histórico continuam no IndexedDB do dispositivo. A publicação não limpa IndexedDB, `localStorage` ou caches do navegador.
 
-## Primeira publicação
+## Acompanhar ou reexecutar a publicação
 
-1. No GitHub, abra **Settings → Pages** e selecione **GitHub Actions** como fonte de publicação.
-2. Na execução acima, use **Re-run all jobs**; alternativamente, abra **Actions → Build and deploy Gy to GitHub Pages** e escolha **Run workflow** com `main`.
-3. Acompanhe testes, build e deploy. Após a conclusão verde, abra `https://edinaldogit.github.io/gy/` e valide carregamento, rotas `/onboarding/`, `/fichas/`, `/historico/` e `/perfil/`, manifest e service worker.
+1. Abra **Actions → Build and deploy Gy to GitHub Pages** e confira a execução do commit desejado.
+2. Para reexecutar, use **Re-run all jobs** ou **Run workflow** com a branch `main`.
+3. Após a conclusão verde, verifique a URL pública, as entradas de rota, manifest e service worker.
 
-Se o workflow não aparecer, confirme que `.github/workflows/deploy.yml` foi enviado para `main` e que Actions está habilitado no repositório. Se o deploy falhar por configuração do Pages, selecione GitHub Actions como fonte e execute novamente. O workflow não configura as opções remotas do repositório automaticamente.
+Em um novo repositório, selecione **GitHub Actions** como fonte em **Settings → Pages → Build and deployment → Source** antes do primeiro deploy. Essa habilitação exige permissão apropriada. O workflow normal usa `GITHUB_TOKEN`, sem credencial de administração para habilitar automaticamente um site ausente.
 
 ## Publicações futuras e versão
 
@@ -46,4 +46,4 @@ Android e iOS continuam usando os fluxos de instalação preparados na Etapa 12C
 
 ## Validação desta etapa
 
-Localmente, `npm ci`, `npm test` (101 testes), `npm run build`, preparo de `dist` e `git diff --check` passaram. O artefato sob `/gy/` respondeu HTTP 200 para a raiz, as quatro entradas de rota, o manifest e o service worker. No GitHub Actions, `npm ci`, todos os testes, build e preparo das rotas também passaram; o job foi bloqueado apenas pela configuração ausente do Pages. A verificação pública confirmou HTTP 404 para a URL do Gy e para a API de configuração Pages. Não foi possível verificar os recursos servidos pelo site, funcionamento online/offline publicado, instalação ou atualização em produção até que o Pages seja habilitado.
+Na preparação 12D, `npm ci`, `npm test` (101 testes), `npm run build`, preparo de `dist` e `git diff --check` passaram. O artefato local respondeu HTTP 200 para a raiz, as quatro rotas originais, o manifest e o service worker. A tentativa inicial do Actions foi interrompida na configuração de Pages. Sua reexecução terminou com sucesso, e a conferência posterior confirmou HTTP 200 na URL pública. As alterações e verificações da versão 0.1.0 são descritas em `docs/etapa13-evolucao-experiencia.md`.

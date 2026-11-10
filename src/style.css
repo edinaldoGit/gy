@@ -9,6 +9,17 @@
 }
 
 @theme {
+  --color-sage-50: #eff6f1;
+  --color-sage-100: #dcebe0;
+  --color-sage-200: #bad7c4;
+  --color-sage-300: #91bca1;
+  --color-sage-400: #689d7c;
+  --color-sage-500: #3f795f;
+  --color-sage-600: #32614c;
+  --color-sage-700: #264a3a;
+  --color-sage-800: #193426;
+  --color-sage-900: #102319;
+
 
   --font-sans: "Fredoka", sans-serif;
 
@@ -133,3 +144,5 @@
   .gy-modal-enter-active .gy-modal-panel, .gy-modal-leave-active .gy-modal-panel,
   .gy-sheet-enter-active, .gy-sheet-leave-active { transition: none; }
 }
+
+html, body, #app { background-color: var(--gy-system-color, #fc6471); }

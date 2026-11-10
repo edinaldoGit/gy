@@ -2,10 +2,9 @@
 import { feedback } from '@/composables/useFeedback'
 import { computed, onMounted, ref } from 'vue'
 import { db, type HistoricoTreino } from '@/database/db'
-import { ArrowUpRight, CalendarDays, Check, ChevronDown, Clock3, Dumbbell, History, RefreshCw, ChartNoAxesCombined } from 'lucide-vue-next'
+import { ArrowUpRight, CalendarDays, Check, ChevronDown, Clock3, Dumbbell, History, RefreshCw } from 'lucide-vue-next'
 import HistoricoDetalhe from '@/components/historico/HistoricoDetalhe.vue'
 import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
-import EvolucaoDesempenho from '@/components/historico/EvolucaoDesempenho.vue'
 import { calcularResumoHistorico, contarExercicios, contarSeriesDaSessao, dataConclusao, formatarData, formatarTempoTotal, ordenarHistorico, obterDuracaoMinutos, formatarDuracao } from '@/utils/historico'
 
 const carregando = ref(true)
@@ -13,7 +12,6 @@ const erro = ref(false)
 const sessoes = ref<HistoricoTreino[]>([])
 const sessaoSelecionada = ref<HistoricoTreino | null>(null)
 const limiteVisivel = ref(20)
-const mostrarDesempenho = ref(false)
 
 const resumo = computed(() => calcularResumoHistorico(sessoes.value))
 const sessoesOrdenadas = computed(() => ordenarHistorico(sessoes.value))
@@ -49,9 +47,7 @@ const horarioCard = (sessao: HistoricoTreino) => {
 
 <template>
   <div class="mx-auto flex w-full max-w-4xl flex-col gap-5 pb-10">
-    <EvolucaoDesempenho v-if="mostrarDesempenho" @voltar="mostrarDesempenho = false" />
 
-    <template v-else>
     <SectionPageHeader titulo="Histórico de treinos" subtitulo="Sua jornada · Cada treino conta" tema="historico" />
 
     <section aria-label="Resumo da atividade" class="grid grid-cols-3 gap-2 sm:gap-3">
@@ -71,12 +67,6 @@ const horarioCard = (sessao: HistoricoTreino) => {
         <p class="mt-0.5 text-[10px] text-whitesmoke-500">registrado</p>
       </article>
     </section>
-
-    <button type="button" class="group flex w-full items-center gap-4 rounded-3xl border border-teal-100 bg-white p-4 text-left shadow-sm transition hover:border-teal-300 hover:bg-teal-50/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600 sm:p-5" @click="mostrarDesempenho = true">
-      <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-teal-50 text-teal-700 transition group-hover:bg-teal-100"><ChartNoAxesCombined :size="23" /></span>
-      <span class="min-w-0 flex-1"><span class="block font-black text-whitesmoke-950">Evolução de desempenho</span><span class="mt-0.5 block text-sm text-whitesmoke-500">Acompanhe cargas, repetições e volume por exercício</span></span>
-      <span class="text-sm font-bold text-teal-700">Abrir</span>
-    </button>
 
     <section aria-labelledby="lista-historico-titulo" class="flex flex-col gap-3">
       <div class="flex items-center justify-between px-1">
@@ -145,6 +135,5 @@ const horarioCard = (sessao: HistoricoTreino) => {
     </section>
 
     <Transition name="gy-modal" :duration="{ enter: 420, leave: 280 }" appear><HistoricoDetalhe v-if="sessaoSelecionada" :sessao="sessaoSelecionada" @fechar="sessaoSelecionada = null" /></Transition>
-    </template>
   </div>
 </template>

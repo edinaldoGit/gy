@@ -47,8 +47,8 @@ test('exporta tabelas persistidas, datas, foto, fichas e sessão em andamento', 
   const dbFake = adaptador(fixture())
   const backup = await exportarBackup(dbFake, agora)
   assert.equal(backup.formato, FORMATO_BACKUP)
-  assert.equal(backup.versao, 3)
-  assert.equal(backup.schemaOrigem, 5)
+  assert.equal(backup.versao, 4)
+  assert.equal(backup.schemaOrigem, 6)
   assert.deepEqual(backup.tabelas.medidasCorporais, fixture().medidasCorporais)
   assert.equal(backup.tabelas.perfil[0].fotoPerfil, fixture().perfil[0].fotoPerfil)
   assert.equal(backup.tabelas.programacoes[0].fusoHorario, 'America/Sao_Paulo')
@@ -207,4 +207,20 @@ test('bloqueia novas gravações enquanto uma restauração está coordenada', a
     await assert.rejects(comGravacaoGy(async () => { escreveu = true }), /dados estão sendo restaurados/)
     assert.equal(escreveu, false)
   } finally { gravacoesBackupBloqueadas.value = false }
+})
+
+test('backup v4 preserva agenda deslocada e continua lendo documentos v3', async () => {
+  const tabelas = fixture()
+  tabelas.programacoes.push({ ...copia(tabelas.programacoes[0]), id: 23, motivo: 'deslocamento', efetivaEm: new Date('2026-11-03T12:00:00Z'), diaLocalVigencia:'2026-11-03', agenda: { inicio:'2026-11-03',fim:'2026-11-08',itens:[{dia:'2026-11-03',treinoId:14,treinoNome:'Treino A'},{dia:'2026-11-04',treinoId:15,treinoNome:'Treino B'}] } })
+  const origem=adaptador(tabelas)
+  const backup=await exportarBackup(origem,agora)
+  const destino=adaptador(fixture())
+  await restaurarBackup(destino,backup)
+  assert.deepEqual(destino.tabelas,tabelas)
+  const legado=await exportarBackup(adaptador(fixture()),agora)
+  legado.versao=3
+  assert.equal(validarBackup(legado).versao,3)
+  for(const mudar of [b=>b.tabelas.programacoes[1].agenda.itens.push({...b.tabelas.programacoes[1].agenda.itens[0]}),b=>b.tabelas.programacoes[1].agenda.itens[0].treinoId=999,b=>b.tabelas.programacoes[1].agenda.itens[0].dia='2026-11-02']) {
+    const invalido=copia(backup); mudar(invalido); assert.throws(()=>validarBackup(invalido))
+  }
 })

@@ -1,10 +1,12 @@
 import { feedback } from '@/composables/useFeedback'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { db, type ConfiguracaoApp, type ExercicioCatalogo, type Ficha, type FichaCompleta, type Treino } from '@/database/db'
+import { db, type ConfiguracaoApp, type ExercicioCatalogo, type Ficha, type FichaCompleta, type ProgramacaoVigente, type Treino } from '@/database/db'
 import { conflitoDeDia, snapshotProgramacao } from '@/utils/programacao'
 import { comGravacaoGy } from '@/database/writeLock'
 import { novaIdentidadePersonalizada } from '@/utils/identidadeExercicio'
+import { diaDaConclusao } from '@/utils/limiteDiario'
+import { diaLocal } from '@/utils/diasLocais'
 import { filtrarCatalogo } from '@/utils/catalogo'
 
 type ModoFicha = 'lista' | 'detalhe' | 'step1' | 'treino-info' | 'step2' | 'step3'
@@ -19,6 +21,7 @@ export const useFichaStore = defineStore('ficha', () => {
   const modo = ref<ModoFicha>('lista')
   const contextoWizard = ref<ContextoWizard>('nova-ficha')
   const fichasSalvas = ref<FichaCompleta[]>([])
+  const programacoes = ref<ProgramacaoVigente[]>([])
   const fichaAtivaId = ref<number | null>(null)
   const catalogo = ref<ExercicioCatalogo[]>([])
   const termoBusca = ref('')
@@ -55,8 +58,8 @@ export const useFichaStore = defineStore('ficha', () => {
   const isExercicioSelecionado = (id: number) => treinoEditando.value.exercicios.some(ex => ex.exercicioId === id)
 
   const carregarDados = async () => {
-    const [registrosFicha, treinos, listaCatalogo, config] = await Promise.all([
-      db.fichas.toArray(), db.treinos.toArray(), db.catalogo.toArray(), db.configuracoes.get('principal')
+    const [registrosFicha, treinos, listaCatalogo, config, agendas] = await Promise.all([
+      db.fichas.toArray(), db.treinos.toArray(), db.catalogo.toArray(), db.configuracoes.get('principal'), db.programacoes.toArray()
     ])
     // Registros do modelo anterior permanecem no banco até uma limpeza manual explícita.
     // Eles não são apresentados como fichas válidas porque não têm identidade do programa.
@@ -64,6 +67,7 @@ export const useFichaStore = defineStore('ficha', () => {
       (ficha.origem === 'local' || ficha.origem === 'importada') &&
       ficha.criadoEm instanceof Date && ficha.atualizadoEm instanceof Date
     )
+    programacoes.value = agendas
     fichaAtivaId.value = config?.fichaAtivaId ?? null
     catalogo.value = listaCatalogo
     fichasSalvas.value = fichas.map(ficha => ({
@@ -105,8 +109,15 @@ export const useFichaStore = defineStore('ficha', () => {
       descricao: fichaEditando.value.descricao?.trim() || '', corTema: fichaEditando.value.corTema || 'cerulean',
       origem: fichaEditando.value.origem || 'local', criadoEm: existente?.criadoEm || fichaEditando.value.criadoEm || agora, atualizadoEm: agora
     }
-    await comGravacaoGy(() => db.transaction('rw', db.fichas, db.configuracoes, db.treinos, db.programacoes, async () => {
+    let ativadaAutomaticamente = false
+    await comGravacaoGy(() => db.transaction('rw', db.fichas, db.configuracoes, db.treinos, db.programacoes, db.historico, async () => {
+      const primeiraLocal = !existente && ficha.origem === 'local' && await db.fichas.count() === 0
       ficha.id = await db.fichas.put(ficha)
+      if (primeiraLocal) {
+        ativadaAutomaticamente = true
+        await db.configuracoes.put({ chave: 'principal', fichaAtivaId: ficha.id })
+        await registrarProgramacao(ficha.id!, 'ativacao')
+      }
       if (existente) {
         const config = await db.configuracoes.get('principal')
         if (config?.fichaAtivaId === ficha.id) await registrarProgramacao(ficha.id, 'edicao')
@@ -114,7 +125,7 @@ export const useFichaStore = defineStore('ficha', () => {
     }))
     fichaEditando.value.id = ficha.id
     await carregarDados()
-    feedback.success(existente ? 'Ficha atualizada com sucesso!' : 'Ficha criada com sucesso!')
+    feedback.success(existente ? 'Ficha atualizada com sucesso!' : ativadaAutomaticamente ? 'Primeira ficha criada e ativada!' : 'Ficha criada com sucesso!')
     return true
   }
   const continuarParaTreinos = async () => {
@@ -180,7 +191,7 @@ export const useFichaStore = defineStore('ficha', () => {
       })),
       criadoEm: anterior?.criadoEm || agora, atualizadoEm: agora
     }
-    await comGravacaoGy(() => db.transaction('rw', db.treinos, db.configuracoes, db.fichas, db.programacoes, async () => {
+    await comGravacaoGy(() => db.transaction('rw', db.treinos, db.configuracoes, db.fichas, db.programacoes, db.historico, async () => {
       await db.treinos.put(treino)
       if ((await db.configuracoes.get('principal'))?.fichaAtivaId === fichaId) await registrarProgramacao(fichaId, 'edicao')
     }))
@@ -192,6 +203,11 @@ export const useFichaStore = defineStore('ficha', () => {
   }
   const fichaAtivaLocalizada = () => fichasSalvas.value.find(ficha => ficha.id === fichaEditando.value.id) || fichaSelecionada.value
   const registrarProgramacao = async (fichaId: number | null, motivo: 'ativacao' | 'troca' | 'edicao' | 'desativacao') => {
+    const ultimaAgenda = await db.programacoes.orderBy('efetivaEm').last()
+    if (ultimaAgenda?.agenda && motivo !== 'ativacao') {
+      const concluidos = new Set((await db.historico.toArray()).map(diaDaConclusao))
+      if (ultimaAgenda.agenda.itens.some(item => item.dia >= diaLocal(new Date()) && !concluidos.has(item.dia))) throw new Error('Conclua os treinos da programação deslocada antes de editar, excluir ou trocar a ficha ativa.')
+    }
     const ficha = fichaId === null ? null : await db.fichas.get(fichaId)
     const treinos = fichaId === null ? [] : await db.treinos.where('fichaId').equals(fichaId).toArray()
     const ultima = await db.programacoes.orderBy('efetivaEm').last()
@@ -225,7 +241,7 @@ export const useFichaStore = defineStore('ficha', () => {
     if (ficha.id == null) return false
     const sessao = await db.historico.where('estado').equals('em_andamento').first()
     if (sessao?.fichaId === ficha.id) throw new Error('Finalize ou cancele a sessão em andamento antes de excluir esta ficha.')
-    await comGravacaoGy(() => db.transaction('rw', db.fichas, db.treinos, db.configuracoes, db.programacoes, async () => {
+    await comGravacaoGy(() => db.transaction('rw', db.fichas, db.treinos, db.configuracoes, db.programacoes, db.historico, async () => {
       const config = await db.configuracoes.get('principal')
       if (config?.fichaAtivaId === ficha.id) {
         await db.configuracoes.put({ chave: 'principal', fichaAtivaId: null })
@@ -298,7 +314,7 @@ export const useFichaStore = defineStore('ficha', () => {
   }
 
   return {
-    criandoExercicio, erroExercicio, salvando, erroSalvamento, modo, contextoWizard, fichasSalvas, fichaAtivaId, fichaAtual, fichasBiblioteca, catalogo, termoBusca, descansoGlobal,
+    criandoExercicio, erroExercicio, salvando, erroSalvamento, modo, contextoWizard, programacoes, fichasSalvas, fichaAtivaId, fichaAtual, fichasBiblioteca, catalogo, termoBusca, descansoGlobal,
     modalCriarExAberto, fichaSelecionada, filtroOrigem, paletaCores, fichaEditando, treinoEditando, novoEx, diasOcupados,
     corEstaEmUso, getCorObj, exerciciosAgrupados, resultadosBusca, isExercicioSelecionado,
     carregarDados, abrirNovaFicha, abrirDetalhes, voltar, abrirEdicaoFicha, continuarParaTreinos, adicionarTreino, editarTreino,

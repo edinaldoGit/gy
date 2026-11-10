@@ -2,12 +2,15 @@
 import { feedback } from '@/composables/useFeedback'
 import ModalSheetHeader from '@/components/layout/ModalSheetHeader.vue'
 import { modalSheetBackdrop, modalSheetPanel } from '@/components/layout/modalSheetStyles'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { criarLinkFicha, lerLinkFicha } from '@/utils/fichaLink'
 import { storeToRefs } from 'pinia'
 import { Download, FileUp, Share2, Check, LoaderCircle } from 'lucide-vue-next'
 import { db } from '@/database/db'
 import { useFichaStore } from '@/stores/fichaStore'
 import {
+  criarDocumentoFichas,
   ErroCompartilhamento,
   TAMANHO_MAXIMO_ARQUIVO,
   diasDaSemanaLabels,
@@ -15,7 +18,7 @@ import {
   validarDocumentoFichas,
   type DocumentoFichas
 } from '@/utils/fichaCompartilhamento'
-import { baixarFichas, importarDocumentoFichas } from '@/services/fichaCompartilhamento'
+import { baixarFichas, importarDocumentoFichas, criarArquivoFicha, podeCompartilharArquivo, compartilharArquivo } from '@/services/fichaCompartilhamento'
 
 const props = withDefaults(defineProps<{ compact?: boolean; fichaId?: number; somenteExportar?: boolean }>(), { compact: false, somenteExportar: false })
 
@@ -28,6 +31,42 @@ const documento = ref<DocumentoFichas | null>(null)
 const processando = ref(false)
 const erro = ref('')
 const aviso = ref('')
+
+const route = useRoute()
+const router = useRouter()
+const linkGerado = ref('')
+const linkOcupado = ref(false)
+const arquivoNativo = computed(() => {
+  try { return fichasSelecionadas.value.length ? criarArquivoFicha(fichasSelecionadas.value, catalogo.value) : null }
+  catch { return null }
+})
+const nativoDisponivel = computed(() => arquivoNativo.value && podeCompartilharArquivo(arquivoNativo.value))
+watch(idsSelecionados, () => { linkGerado.value = '' }, { deep: true })
+watch(() => route.hash, async hash => {
+  if (props.somenteExportar || !hash.startsWith('#gy-ficha=')) return
+  try { documento.value = await lerLinkFicha(hash); catalogo.value = await db.catalogo.toArray() }
+  catch (falha) { feedback.error(falha instanceof Error ? falha.message : 'Link inválido.') }
+  finally { await router.replace({ path: route.path, query: route.query, hash: '' }) }
+}, { immediate: true })
+async function compartilharNativo() {
+  if (!arquivoNativo.value || processando.value) return
+  processando.value = true
+  try { if (await compartilharArquivo(arquivoNativo.value) === 'compartilhado') { feedback.success('Ficha entregue ao compartilhamento do dispositivo.'); exportacaoAberta.value = false } }
+  catch { feedback.error('Não foi possível compartilhar. Tente exportar o arquivo.') }
+  finally { processando.value = false }
+}
+async function gerarLink() {
+  if (linkOcupado.value) return
+  linkOcupado.value = true
+  try { linkGerado.value = await criarLinkFicha(criarDocumentoFichas(fichasSelecionadas.value, catalogo.value), new URL(`${import.meta.env.BASE_URL}fichas/`, location.origin).href) }
+  catch (falha) { feedback.warning(falha instanceof Error ? falha.message : 'Não foi possível criar o link.') }
+  finally { linkOcupado.value = false }
+}
+async function copiarLink() {
+  try { await navigator.clipboard.writeText(linkGerado.value); feedback.success('Link copiado!') }
+  catch { feedback.warning('Selecione o link abaixo e copie pelo menu do dispositivo.') }
+}
+const podeGerarLink = typeof CompressionStream !== 'undefined'
 
 const exerciciosNovos = computed(() => {
   if (!documento.value) return new Set<string>()
@@ -118,8 +157,8 @@ const fecharPrevia = () => {
 <template>
   <div class="flex flex-col gap-2">
     <div class="flex flex-wrap gap-2">
-      <button type="button" :aria-label="compact ? 'Exportar fichas' : undefined" :title="compact ? 'Exportar fichas' : undefined" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white text-xs font-bold text-whitesmoke-700 shadow-sm transition hover:bg-cerulean-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cerulean-600" :class="compact ? 'w-11 px-0' : 'px-3'" @click="exportacaoAberta = true; idsSelecionados = props.fichaId ? [props.fichaId] : []">
-        <Share2 :size="16" class="text-cerulean-600" /><span v-if="!compact">Exportar fichas</span>
+      <button type="button" :aria-label="compact ? (props.fichaId ? 'Compartilhar ficha' : 'Compartilhar fichas') : undefined" :title="compact ? (props.fichaId ? 'Compartilhar ficha' : 'Compartilhar fichas') : undefined" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white text-xs font-bold text-whitesmoke-700 shadow-sm transition hover:bg-cerulean-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cerulean-600" :class="compact ? 'w-11 px-0' : 'px-3'" @click="exportacaoAberta = true; idsSelecionados = props.fichaId ? [props.fichaId] : []">
+        <Share2 :size="16" class="text-cerulean-600" /><span v-if="!compact">Compartilhar fichas</span>
       </button>
       <button v-if="!somenteExportar" type="button" :aria-label="compact ? 'Importar fichas' : undefined" :title="compact ? 'Importar fichas' : undefined" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white text-xs font-bold text-whitesmoke-700 shadow-sm transition hover:bg-cerulean-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cerulean-600" :class="compact ? 'w-11 px-0' : 'px-3'" @click="abrirSeletorArquivo">
         <FileUp :size="16" class="text-cerulean-600" /><span v-if="!compact">Importar fichas</span>
@@ -131,7 +170,7 @@ const fecharPrevia = () => {
 
   <Transition name="gy-modal" :duration="{ enter: 420, leave: 280 }" appear><div v-if="exportacaoAberta" :class="modalSheetBackdrop" @click.self="exportacaoAberta = false">
     <section role="dialog" aria-modal="true" aria-labelledby="exportacao-titulo" :class="modalSheetPanel">
-      <ModalSheetHeader titulo="Exportar fichas" subtitulo="Escolha o que deseja compartilhar." etiqueta="Compartilhamento" cor-classe="bg-cerulean-600" titulo-id="exportacao-titulo" @fechar="exportacaoAberta = false" />
+      <ModalSheetHeader titulo="Compartilhar ficha" subtitulo="Escolha o que deseja compartilhar." etiqueta="Compartilhamento" cor-classe="bg-cerulean-600" titulo-id="exportacao-titulo" @fechar="exportacaoAberta = false" />
       <div class="min-h-0 overflow-y-auto p-6">
         <p v-if="!fichasSalvas.length" class="rounded-2xl bg-white p-5 text-center text-sm text-whitesmoke-500">Você ainda não tem fichas para exportar.</p>
         <template v-else>
@@ -148,6 +187,11 @@ const fecharPrevia = () => {
             </span>
           </label>
         </template>
+      </div>
+      <div v-if="fichasSelecionadas.length" class="shrink-0 border-t border-whitesmoke-200 p-4 flex flex-col gap-2">
+        <button v-if="nativoDisponivel" type="button" :disabled="processando" class="min-h-11 rounded-xl bg-cerulean-600 p-3 text-sm font-bold text-white disabled:opacity-50" @click="compartilharNativo">{{ processando ? 'Compartilhando…' : 'Compartilhar pelo celular' }}</button>
+        <button v-if="podeGerarLink" type="button" :disabled="linkOcupado" class="min-h-11 rounded-xl bg-cerulean-50 p-3 text-sm font-bold text-cerulean-800" @click="gerarLink">{{ linkOcupado ? 'Preparando…' : 'Gerar link de importação' }}</button>
+        <div v-if="linkGerado" class="flex flex-col gap-2"><label class="text-xs font-bold text-cerulean-800">Link da ficha<input :value="linkGerado" readonly class="mt-1 min-h-11 w-full rounded-xl border border-whitesmoke-200 bg-white px-3 text-xs" @focus="($event.target as HTMLInputElement).select()" /></label><button type="button" class="min-h-11 rounded-xl border border-cerulean-200 text-sm font-bold text-cerulean-800" @click="copiarLink">Copiar link</button></div>
       </div>
       <footer class="flex shrink-0 gap-3 border-t border-whitesmoke-200 bg-whitesmoke-50 p-6">
         <button type="button" class="min-h-11 flex-1 rounded-xl border border-whitesmoke-200 px-4 text-sm font-bold text-whitesmoke-700 hover:bg-whitesmoke-50" @click="exportacaoAberta = false">Cancelar</button>

@@ -1,7 +1,8 @@
 import type { HistoricoTreino, ProgramacaoVigente } from '../database/db.ts'
+import { compromissoNoDia } from './programacaoEfetiva.ts'
 import { dataCivil, diaLocal, proximoDia } from './diasLocais.ts'
 
-type Programacao = Pick<ProgramacaoVigente, 'efetivaEm' | 'diaLocalVigencia' | 'treinos'> & { id?: number }
+type Programacao = Pick<ProgramacaoVigente, 'efetivaEm' | 'diaLocalVigencia' | 'treinos' | 'agenda'> & { id?: number }
 type Sessao = Pick<HistoricoTreino, 'estado' | 'dataFim' | 'diaConclusaoLocal'> & { id?: number }
 export interface Sequencia {
   quantidade: number
@@ -17,9 +18,6 @@ const instante = (valor: unknown): Date | null => {
   const data = new Date(valor)
   return Number.isFinite(data.getTime()) ? data : null
 }
-const diasSemanais = (programacao: Programacao | undefined) =>
-  new Set(programacao?.treinos.flatMap(treino => treino.diasDaSemana).filter(dia => Number.isInteger(dia) && dia >= 0 && dia <= 6) ?? [])
-
 export const calcularSequencia = (programacoes: Programacao[], sessoes: Sessao[], agora: Date): Sequencia => {
   const hoje = diaLocal(agora)
   const resultado: Sequencia = { quantidade: 0, desbloqueada: false, ultimoDiaConcluido: null, diasProgramados: [], diasConcluidos: [], diasPerdidos: [], diaAvaliado: hoje }
@@ -42,13 +40,13 @@ export const calcularSequencia = (programacoes: Programacao[], sessoes: Sessao[]
   let vigente: Programacao | undefined
   // Identificadores civis validados YYYY-MM-DD têm a mesma ordem do calendário.
   for (let dia = vigencias[0]!.dia; dia <= ultimoDia; dia = proximoDia(dia)) {
-    const dias = diasSemanais(vigente)
+    let obrigatorio = !!compromissoNoDia(vigente, dia)
     while (indice < vigencias.length && vigencias[indice]!.dia === dia) {
       vigente = vigencias[indice++]!.programacao
       // Remover ou trocar a ficha não apaga um compromisso assumido no próprio dia.
-      for (const semana of diasSemanais(vigente)) dias.add(semana)
+      obrigatorio ||= !!compromissoNoDia(vigente, dia)
     }
-    if (!dias.has(dataCivil(dia)!.getUTCDay())) continue
+    if (!obrigatorio) continue
     resultado.diasProgramados.push(dia)
     if (conclusoes.has(dia)) {
       resultado.quantidade++

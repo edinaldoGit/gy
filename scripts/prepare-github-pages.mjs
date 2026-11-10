@@ -2,7 +2,7 @@ import { copyFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
-export const paginasComEntradaDireta = ['onboarding', 'fichas', 'historico', 'perfil']
+export const paginasComEntradaDireta = ['onboarding', 'fichas', 'historico', 'evolucao', 'perfil']
 
 export async function prepararPaginasGitHubPages(diretorioDist = path.resolve('dist')) {
   const indexPrincipal = path.join(diretorioDist, 'index.html')

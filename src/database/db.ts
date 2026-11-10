@@ -76,9 +76,16 @@ export interface ProgramacaoVigente {
   diaLocalVigencia?: string;
   fusoHorario?: string;
   offsetMinutos?: number;
-  motivo: 'ativacao' | 'troca' | 'edicao' | 'desativacao';
+  motivo: 'ativacao' | 'troca' | 'edicao' | 'desativacao' | 'deslocamento';
+  agenda?: AgendaEfetiva;
   fichaNome: string | null;
   treinos: Array<{ treinoId: number; treinoNome: string; diasDaSemana: number[] }>;
+}
+
+export interface AgendaEfetiva {
+  inicio: string;
+  fim: string;
+  itens: Array<{ dia: string; treinoId: number; treinoNome: string }>;
 }
 
 export interface HistoricoTreino {
@@ -187,6 +194,7 @@ export class GyDB extends Dexie {
       historico: '++id, fichaId, treinoId, dataFim, estado, dataInicio',
       medidasCorporais: '++id, &dataLocal'
     });
+    this.version(6).stores({ programacoes: '++id, fichaId, efetivaEm' });
   }
 }
 

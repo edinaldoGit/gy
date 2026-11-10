@@ -4,9 +4,9 @@ import { computed } from 'vue'
 const props = withDefaults(defineProps<{
   pontos: Array<{ data: string; valor: number }>
   unidade: string
-  cor?: 'bubblegum' | 'teal'
+  cor?: 'bubblegum' | 'teal' | 'sage'
   rotulo: string
-}>(), { cor: 'bubblegum' })
+}>(), { cor: 'sage' })
 
 const largura = 640
 const altura = 220
@@ -22,8 +22,8 @@ const posicoes = computed(() => {
     y: altura - margens.y - (ponto.valor - menor + intervalo * 0.08) / (intervalo * 1.16) * (altura - margens.y * 2)
   }))
 })
-const corClasse = computed(() => props.cor === 'teal' ? 'text-teal-600' : 'text-bubblegum-500')
-const stroke = computed(() => props.cor === 'teal' ? '#0d9488' : '#ec4899')
+const corClasse = computed(() => props.cor === 'sage' ? 'text-sage-600' : props.cor === 'teal' ? 'text-teal-600' : 'text-bubblegum-500')
+const stroke = computed(() => props.cor === 'sage' ? '#3f795f' : props.cor === 'teal' ? '#0d9488' : '#ec4899')
 const path = computed(() => posicoes.value.map((ponto, index) => `${index ? 'L' : 'M'} ${ponto.x} ${ponto.y}`).join(' '))
 const numero = (valor: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(valor)
 </script>

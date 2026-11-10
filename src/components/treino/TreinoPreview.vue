@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { feedback } from '@/composables/useFeedback'
+import { confirmation } from '@/composables/useConfirm'
+import { previaDeslocamento, aplicarDeslocamento } from '@/services/deslocamento'
+import { formatarDataCivil } from '@/utils/evolucao'
 import ModalSheetHeader from '@/components/layout/ModalSheetHeader.vue'
 import { modalSheetBackdrop, modalSheetPanel } from '@/components/layout/modalSheetStyles'
 import { useRouter } from 'vue-router'
@@ -7,6 +12,24 @@ import { useTreinoStore } from '@/stores/treinoStore'
 import { Play, Dumbbell, Clock, Flame, ArrowRightLeft, CalendarDays, Coffee, CheckCircle2 } from 'lucide-vue-next'
 import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
 
+const preparandoDeslocamento = ref(false)
+async function deslocar() {
+  if (preparandoDeslocamento.value) return
+  preparandoDeslocamento.value = true
+  try {
+    const previa = await previaDeslocamento()
+    modalTrocaAberto.value = false
+    const confirmado = await confirmation.ask({
+      title: 'Deslocar programação +1 dia?',
+      message: 'Os treinos pendentes abaixo serão movidos em um dia. As faltas passadas continuam registradas. Esta alteração não possui desfazer.',
+      details: previa.alteracoes.map(item => `${item.treinoNome}: ${formatarDataCivil(item.de)} → ${formatarDataCivil(item.para)}`).join('\n'),
+      variant: 'warning', cancelText: 'Manter programação', confirmText: 'Deslocar +1 dia',
+      action: () => aplicarDeslocamento(previa.assinatura)
+    })
+    if (confirmado) { await store.carregarTreinoDoDia(); feedback.success('Programação deslocada em um dia.') }
+  } catch (erro) { feedback.warning(erro instanceof Error ? erro.message : 'Não foi possível preparar o deslocamento.') }
+  finally { preparandoDeslocamento.value = false }
+}
 const router = useRouter()
 const store = useTreinoStore()
 const { treinoHoje, fichasSalvas, fichaAtual, modalTrocaAberto, treinoAmanha, treinoFinalizadoHoje, estadoPersistencia, erroPersistencia } = storeToRefs(store)
@@ -31,7 +54,7 @@ const formatarDias = (dias?: number[]) => {
       </button>
     </div>
 
-    <div v-if="!fichaAtual" class="bg-white rounded-[2rem] p-8 border border-whitesmoke-200 flex flex-col items-center justify-center text-center mt-4 mx-2">
+    <div v-if="!fichaAtual && !treinoFinalizadoHoje" class="bg-white rounded-[2rem] p-8 border border-whitesmoke-200 flex flex-col items-center justify-center text-center mt-4 mx-2">
       <img src="@/assets/logo.png" alt="Gy Logo" class="w-24 h-24 object-contain mb-4 hover:scale-110 transition-transform duration-300" />
       <h3 class="text-xl font-black text-whitesmoke-950">Escolha sua ficha atual</h3>
       <p class="text-sm font-medium text-whitesmoke-500 mt-2 mb-6">A aba Fichas mostra seus programas. Selecione qual rotina está valendo agora.</p>
@@ -47,8 +70,8 @@ const formatarDias = (dias?: number[]) => {
         <div class="w-20 h-20 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center text-emerald-500 mb-5 border border-emerald-100">
           <CheckCircle2 :size="40" stroke-width="2" />
         </div>
-        <h3 class="text-xl font-black text-whitesmoke-950 leading-tight mb-2">Missão Cumprida!</h3>
-        <p class="text-sm font-medium text-whitesmoke-500">Você já finalizou o treino de hoje. Lembre-se que o descanso adequado também constrói resultados.</p>
+        <h3 class="text-xl font-black text-whitesmoke-950 leading-tight mb-2">Treino concluído hoje</h3>
+        <p class="text-sm font-medium text-whitesmoke-500">Seu próximo treino poderá ser realizado em outro dia. Aproveite o descanso!</p><RouterLink to="/historico" class="mt-4 min-h-11 rounded-xl bg-amethyst-50 p-3 text-sm font-bold text-amethyst-700">Ver no Histórico</RouterLink>
       </div>
 
       <div v-else-if="!treinoHoje" class="bg-white rounded-[2rem] p-8 border border-whitesmoke-200 flex flex-col items-center justify-center text-center mx-2">
@@ -128,12 +151,13 @@ const formatarDias = (dias?: number[]) => {
     <Transition name="gy-modal" :duration="{ enter: 420, leave: 280 }" appear><div v-if="modalTrocaAberto" :class="modalSheetBackdrop" @click="modalTrocaAberto = false"></div></Transition>
 
     <Transition name="gy-sheet" appear><div v-if="modalTrocaAberto" role="dialog" aria-modal="true" aria-labelledby="troca-treino-titulo" :class="modalSheetPanel">
-      <ModalSheetHeader titulo="Substituir Treino" subtitulo="Escolha o treino para a sessão de hoje." etiqueta="Treino" cor-classe="bg-amethyst-500" titulo-id="troca-treino-titulo" @fechar="modalTrocaAberto = false" />
+      <ModalSheetHeader titulo="Trocar treino do dia" subtitulo="Escolha uma sessão ou ajuste sua programação." etiqueta="Treino" cor-classe="bg-amethyst-500" titulo-id="troca-treino-titulo" @fechar="modalTrocaAberto = false" />
 
       <div class="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
         
+        <button type="button" :disabled="preparandoDeslocamento" class="min-h-12 rounded-2xl bg-amethyst-50 p-4 text-left font-bold text-amethyst-700 disabled:opacity-50" @click="deslocar">{{ preparandoDeslocamento ? 'Preparando prévia…' : 'Deslocar programação +1 dia' }}<span class="mt-1 block text-xs font-normal">Veja os treinos afetados antes de confirmar.</span></button>
         <p class="rounded-xl bg-whitesmoke-50 p-3 text-xs text-whitesmoke-500">Escolher outro treino vale apenas para esta sessão. Sua programação semanal permanece igual.</p>
-        <h4 class="text-[11px] font-bold text-whitesmoke-400 uppercase tracking-widest mt-2 px-1">Treinos da ficha atual</h4>
+        <h4 class="text-[11px] font-bold text-whitesmoke-400 uppercase tracking-widest mt-2 px-1">Trocar apenas o treino de hoje</h4>
         
         <div class="flex flex-col gap-3">
           <div v-for="treino in fichasSalvas" :key="treino.id" @click="efetuarTrocaTreino(treino)" class="bg-white rounded-2xl p-4 border border-whitesmoke-200 flex items-center gap-4 cursor-pointer hover:border-whitesmoke-300 transition-colors relative overflow-hidden" :class="{'opacity-50 pointer-events-none bg-whitesmoke-50': treino.id === treinoHoje?.id}">

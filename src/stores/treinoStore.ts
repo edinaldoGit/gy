@@ -1,9 +1,11 @@
 import { feedback } from '@/composables/useFeedback'
-import { confirmation } from '@/composables/useConfirm'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { db, type Ficha, type Treino, type ExercicioCatalogo, type HistoricoTreino } from '@/database/db'
+import { compromissoNoDia, programacaoNaData } from '@/utils/programacaoEfetiva'
+import { diaLocal, proximoDia } from '@/utils/diasLocais'
 import { obterTreinoDoDia } from '@/utils/programacao'
+import { concluiuNoDia, mensagemLimiteDiario } from '@/utils/limiteDiario'
 import { contextoConclusao } from '@/utils/diasLocais'
 import { sequencia } from '@/services/sequencia'
 import { comGravacaoGy } from '@/database/writeLock'
@@ -63,19 +65,48 @@ export const useTreinoStore = defineStore('treino', () => {
   const videoUrlAtivo = ref('')
   const videoTituloAtivo = ref('')
 
+  const atualizarLimiteDiario = async () => {
+    treinoFinalizadoHoje.value = concluiuNoDia(await db.historico.toArray())
+    if (sessaoEstado.value === 'em_andamento' && sessaoId.value !== null && !finalizando.value && !cancelando.value) {
+      const atual = await db.historico.get(sessaoId.value)
+      if (atual && atual.estado !== 'em_andamento') {
+        if (timeoutSalvamento) clearTimeout(timeoutSalvamento)
+        timeoutSalvamento = null
+        pararCronometro()
+        pularDescanso()
+        sessaoEstado.value = atual.estado
+        estadoAtual.value = 'preview'
+        exerciciosExecucao.value = []
+        sessaoDataInicio.value = null
+        segundosTreino.value = 0
+        feedback.info('A sessão foi encerrada em outra aba. A agenda foi atualizada.')
+      }
+    }
+    if (!treinoFinalizadoHoje.value && estadoAtual.value === 'concluido') estadoAtual.value = 'preview'
+  }
+
   const carregarTreinoDoDia = async () => {
     try {
       erroPersistencia.value = null
       estadoPersistencia.value = 'salvo'
+      await atualizarLimiteDiario()
       const config = await db.configuracoes.get('principal')
       fichaAtual.value = config?.fichaAtivaId == null ? null : await db.fichas.get(config.fichaAtivaId) || null
       const treinosAtuais = fichaAtual.value?.id ? await db.treinos.where('fichaId').equals(fichaAtual.value.id).toArray() : []
       fichasSalvas.value = treinosAtuais.sort((a, b) => a.ordem - b.ordem).map(treino => ({ ...treino, corTema: treino.corTema || fichaAtual.value!.corTema || 'cerulean', fichaNome: fichaAtual.value!.nome }))
       catalogo.value = await db.catalogo.toArray()
-      const hoje = new Date().getDay()
-      const amanha = (hoje + 1) % 7
-      treinoHoje.value = fichaAtual.value ? obterTreinoDoDia(fichasSalvas.value, hoje) : null
-      treinoAmanha.value = fichaAtual.value ? obterTreinoDoDia(fichasSalvas.value, amanha) : null
+      const hoje = diaLocal(new Date())
+      const programacoes = fichaAtual.value ? await db.programacoes.toArray() : []
+      const resolverTreino = (dia: string) => {
+        const vigente = programacaoNaData(programacoes, dia)
+        if (vigente?.fichaId === fichaAtual.value?.id) {
+          const compromisso = compromissoNoDia(vigente, dia)
+          return fichasSalvas.value.find(item => item.id === compromisso?.treinoId) ?? null
+        }
+        return obterTreinoDoDia(fichasSalvas.value, new Date(`${dia}T12:00:00`).getDay())
+      }
+      treinoHoje.value = fichaAtual.value ? resolverTreino(hoje) : null
+      treinoAmanha.value = fichaAtual.value ? resolverTreino(proximoDia(hoje)) : null
 
       const sessaoAtiva = await buscarSessaoAtiva()
       if (sessaoAtiva) {
@@ -179,6 +210,7 @@ export const useTreinoStore = defineStore('treino', () => {
         const id = await comGravacaoGy(() => db.transaction('rw', db.historico, async () => {
           const existente = await buscarSessaoAtiva()
           if (existente) throw new Error('Já existe outra sessão de treino em andamento.')
+          if (concluiuNoDia(await db.historico.toArray())) throw new Error(mensagemLimiteDiario)
           return db.historico.add(registro)
         }))
         sessaoId.value = id
@@ -192,7 +224,16 @@ export const useTreinoStore = defineStore('treino', () => {
           restaurarSessao(existente)
           return false
         }
-        mostrarFalhaPersistencia(error)
+        if (error instanceof Error && error.message === mensagemLimiteDiario) {
+          pararCronometro()
+          sessaoEstado.value = null
+          sessaoDataInicio.value = null
+          segundosTreino.value = 0
+          estadoAtual.value = 'preview'
+          treinoFinalizadoHoje.value = true
+          exerciciosExecucao.value = []
+          feedback.warning(mensagemLimiteDiario)
+        } else mostrarFalhaPersistencia(error)
         return false
       }
     })()
@@ -391,6 +432,7 @@ export const useTreinoStore = defineStore('treino', () => {
         }
       }
 
+      await atualizarLimiteDiario().catch(() => {})
       void sequencia.recarregar()
       feedback.success('Treino cancelado. Ele não contará como concluído.')
       return true
@@ -424,21 +466,9 @@ export const useTreinoStore = defineStore('treino', () => {
     }
 
     if (sessaoAtiva) {
-      if (sessaoAtiva.id === sessaoId.value) {
-        restaurarSessao(sessaoAtiva)
-        return true
-      }
-
-      const descartar = await confirmation.ask({
-        title: 'Cancelar treino em andamento?',
-        message: 'O treino será cancelado e não contará como sessão concluída.',
-        details: 'Depois do cancelamento, o novo treino será iniciado.', variant: 'error', icon: 'warning',
-        cancelText: 'Continuar treino', confirmText: 'Cancelar treino', action: () => cancelarSessao(sessaoAtiva!)
-      })
-      if (!descartar) {
-        restaurarSessao(sessaoAtiva)
-        return false
-      }
+      restaurarSessao(sessaoAtiva)
+      feedback.info('Treino em andamento recuperado. Continue a sessão ou cancele pelo menu de opções.')
+      return true
     }
 
     if (!ficha.id || !ficha.fichaId) {
@@ -606,6 +636,7 @@ export const useTreinoStore = defineStore('treino', () => {
         if (!atual) throw new Error('A sessão não foi encontrada no banco local.')
         if (atual.estado === 'finalizado') return
         if (atual.estado !== 'em_andamento') throw new Error('A sessão não está mais em andamento.')
+        if (concluiuNoDia(await db.historico.toArray(), concluidaEm, id)) throw new Error(mensagemLimiteDiario)
         if (assinatura(atual) !== snapshotPersistido) throw new Error('A sessão foi alterada em outra aba. Reabra o treino para carregar os dados salvos antes de continuar.')
 
         await db.historico.update(id, {
@@ -724,7 +755,7 @@ export const useTreinoStore = defineStore('treino', () => {
     sessaoId, sessaoEstado, cancelando, estadoPersistencia, erroPersistencia,
     cronometroFormatado, progressoTreino, modalTrocaAberto, modalVideoAberto, videoUrlAtivo, videoTituloAtivo,
     descansoTempoRestante, descansoRodando, descansoZerado,
-    carregarTreinoDoDia, iniciarTreino, cancelarTreino, finalizarTreino, efetuarTrocaTreino, getCorObj,
+    atualizarLimiteDiario, carregarTreinoDoDia, iniciarTreino, cancelarTreino, finalizarTreino, efetuarTrocaTreino, getCorObj,
     concluirSerie, concluirTodasSeries, resetarExercicio, atualizarPesoSequencial, abrirVideo, pularDescanso,
     tentarSalvarNovamente, persistirSessaoAgora, preservarRascunho, pausarParaBackup, retomarAposBackup
   }

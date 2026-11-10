@@ -5,6 +5,8 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { BedDouble, BadgeCheck, CalendarDays, ChevronRight, CirclePlus, Coffee, Copy, Dumbbell, Edit3, Library, Trash2 } from 'lucide-vue-next'
 import { useFichaStore } from '@/stores/fichaStore'
+import { compromissoNoDia, programacaoNaData } from '@/utils/programacaoEfetiva'
+import { diaLocal } from '@/utils/diasLocais'
 import type { FichaCompleta } from '@/database/db'
 import FichasCompartilhamento from './FichasCompartilhamento.vue'
 import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
@@ -15,7 +17,19 @@ const { modo, fichasSalvas, fichaAtual, fichasBiblioteca, fichaSelecionada } = s
 const filtro = ref<'todas' | 'local' | 'importada'>('todas')
 const fichasFiltradas = computed(() => fichasBiblioteca.value.filter(ficha => filtro.value === 'todas' || ficha.origem === filtro.value))
 const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
-const semana = computed(() => [1, 2, 3, 4, 5, 6, 0].map(dia => ({ dia, nome: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dia], treino: fichaSelecionada.value?.treinos.find(t => t.diasDaSemana.includes(dia)) })))
+const agendaDeslocada = computed(() => {
+  const hoje = diaLocal(new Date())
+  const agenda = programacaoNaData(store.programacoes, hoje)?.agenda
+  return fichaSelecionada.value?.id === store.fichaAtivaId && !!agenda && agenda.fim >= hoje
+})
+const semana = computed(() => [1, 2, 3, 4, 5, 6, 0].map((dia, indice) => {
+  const data = new Date()
+  data.setDate(data.getDate() - (data.getDay() + 6) % 7 + indice)
+  const dataLocal = diaLocal(data)
+  const compromisso = compromissoNoDia(programacaoNaData(store.programacoes, dataLocal), dataLocal)
+  const treino = agendaDeslocada.value ? fichaSelecionada.value?.treinos.find(t => t.id === compromisso?.treinoId) : fichaSelecionada.value?.treinos.find(t => t.diasDaSemana.includes(dia))
+  return { dia, nome: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'][dia], treino }
+}))
 const diasDaFicha = (ficha: FichaCompleta) => [...new Set(ficha.treinos.flatMap(treino => treino.diasDaSemana))].sort((a, b) => a - b)
 const resumoDias = (ficha: FichaCompleta) => {
   const atribuidos = diasDaFicha(ficha)
@@ -74,8 +88,9 @@ const excluir = async (ficha: FichaCompleta) => {
           <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cerulean-600 text-white shadow-md shadow-cerulean-600/20"><CalendarDays :size="21" /></span>
           <div><p class="mb-1 text-[9px] font-bold uppercase tracking-[0.2em] text-cerulean-600">Sua rotina</p><h2 id="programacao-titulo" class="text-base font-black tracking-tight text-whitesmoke-950">Programação semanal</h2></div>
         </div>
-        <span class="shrink-0 rounded-full border border-cerulean-100 bg-white px-2.5 py-1.5 text-[10px] font-bold text-cerulean-700">{{ diasDaFicha(fichaSelecionada).length }} / 7 dias</span>
+        <span class="shrink-0 rounded-full border border-cerulean-100 bg-white px-2.5 py-1.5 text-[10px] font-bold text-cerulean-700">{{ semana.filter(item => item.treino).length }} / 7 dias</span>
       </div>
+      <p v-if="agendaDeslocada" class="mb-3 text-xs text-cerulean-800">Agenda efetiva desta semana. Os dias originais dos treinos continuam preservados.</p>
       <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         <div v-for="item in semana" :key="item.dia" class="relative flex min-h-48 min-w-0 flex-col overflow-hidden rounded-[1.5rem] border transition" :class="item.treino ? 'border-white bg-white shadow-md shadow-whitesmoke-950/5' : 'border-dashed border-whitesmoke-200 bg-whitesmoke-50/70'">
           <template v-if="item.treino">

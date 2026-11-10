@@ -38,7 +38,7 @@ onBeforeUnmount(() => { confirmation.cancel() })
         <span class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl" :class="tones[state.options.variant || 'info'].icon"><component :is="icons[state.options.icon || 'warning']" :size="27" /></span>
         <h2 id="confirm-title" class="text-center text-xl font-black text-whitesmoke-950">{{ state.options.title }}</h2>
         <p id="confirm-description" class="mt-3 text-center text-sm leading-relaxed text-whitesmoke-600">{{ state.options.message }}</p>
-        <p v-if="state.options.details" class="mt-3 rounded-xl bg-whitesmoke-50 p-3 text-xs leading-relaxed text-whitesmoke-600">{{ state.options.details }}</p>
+        <p v-if="state.options.details" class="whitespace-pre-line mt-3 rounded-xl bg-whitesmoke-50 p-3 text-xs leading-relaxed text-whitesmoke-600">{{ state.options.details }}</p>
         <p v-if="state.error" role="alert" class="mt-4 rounded-xl bg-bubblegum-50 p-3 text-sm text-bubblegum-700">{{ state.error }}</p>
         <div class="mt-6 flex flex-col gap-3 sm:flex-row">
           <button type="button" :disabled="state.busy" class="min-h-12 flex-1 rounded-full bg-whitesmoke-100 px-4 text-sm font-bold text-whitesmoke-700 disabled:opacity-50" @click="confirmation.cancel">{{ state.options.cancelText || 'Cancelar' }}</button>

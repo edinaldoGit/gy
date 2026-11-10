@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch, shallowRef } from 'vue'
+import { ref, computed, watch, shallowRef } from 'vue'
 import { useRoute } from 'vue-router'
-import { db } from '@/database/db'
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
-import { Dumbbell, ClipboardList, History, User, ChevronDown, UserRound, Flame, Snowflake } from 'lucide-vue-next'
+import { Dumbbell, ClipboardList, History, User, ChevronDown, UserRound, Flame, Snowflake, ChartNoAxesCombined } from 'lucide-vue-next'
+import { usePerfilAtual } from '@/composables/usePerfilAtual'
 import { sequencia } from '@/services/sequencia'
 
 import type { FeedbackMessage } from '@/utils/feedbackManager'
@@ -15,7 +15,8 @@ import { confirmation } from '@/composables/useConfirm'
 
 const route = useRoute()
 const isMenuExpanded = ref(false)
-const fotoUsuario = ref<string | null>(null)
+const { perfil } = usePerfilAtual()
+const fotoUsuario = computed(() => perfil.value?.fotoPerfil ?? null)
 const displayedFeedback = shallowRef<FeedbackMessage | null>(null)
 watch(feedback.current, message => { if (message) displayedFeedback.value = message }, { immediate: true })
 const feedbackVisible = computed(() => !!feedback.current.value && !confirmation.state.value.options)
@@ -38,11 +39,13 @@ const navItems = [
   { name: 'Treino', path: '/', icon: Dumbbell, color: 'amethyst' },
   { name: 'Fichas', path: '/fichas', icon: ClipboardList, color: 'cerulean' },
   { name: 'Histórico', path: '/historico', icon: History, color: 'teal' },
+  { name: 'Evolução', path: '/evolucao', icon: ChartNoAxesCombined, color: 'sage' },
   { name: 'Perfil', path: '/perfil', icon: User, color: 'bubblegum' }
 ]
 
+const caminhoAtual = computed(() => route.path.replace(/\/$/, '') || '/')
 const currentTab = computed(() => {
-  return navItems.find(item => item.path === route.path) || navItems[0]
+  return navItems.find(item => item.path === caminhoAtual.value) || navItems[0]
 })
 
 const headerBgClass = computed(() => {
@@ -50,6 +53,7 @@ const headerBgClass = computed(() => {
     'amethyst': 'bg-amethyst-500',
     'cerulean': 'bg-cerulean-600',
     'teal': 'bg-teal-600',
+    'sage': 'bg-sage-500',
     'bubblegum': 'bg-bubblegum-500'
   }
   return colorMap[currentTab.value.color]
@@ -62,6 +66,7 @@ const activeTabStyles = computed(() => {
     'amethyst': { icon: 'text-amethyst-500', pillBg: 'bg-amethyst-50', pillText: 'text-amethyst-600' },
     'cerulean': { icon: 'text-cerulean-600', pillBg: 'bg-cerulean-50', pillText: 'text-cerulean-700' },
     'teal': { icon: 'text-teal-600', pillBg: 'bg-teal-50', pillText: 'text-teal-700' },
+    'sage': { icon: 'text-sage-500', pillBg: 'bg-sage-50', pillText: 'text-sage-600' },
     'bubblegum': { icon: 'text-bubblegum-500', pillBg: 'bg-bubblegum-50', pillText: 'text-bubblegum-600' }
   }
   return styles[currentTab.value.color]
@@ -71,12 +76,6 @@ const toggleMenu = () => {
   isMenuExpanded.value = !isMenuExpanded.value
 }
 
-onMounted(async () => {
-  const perfil = await db.perfil.toCollection().first()
-  if (perfil?.fotoPerfil) {
-    fotoUsuario.value = perfil.fotoPerfil
-  }
-})
 </script>
 
 <template>
@@ -94,14 +93,14 @@ onMounted(async () => {
         <div class="flex items-center flex-1 justify-start">
           <div class="w-14 h-14 rounded-full bg-whitesmoke-50 flex items-center justify-center overflow-hidden border-[2px] border-whitesmoke-50 shadow-sm relative z-10 shrink-0 transition-all duration-300"
                :class="{'ring-4 ring-whitesmoke-50/30': isWorkoutActive}">
-            <img v-if="fotoUsuario" :src="fotoUsuario" class="w-full h-full object-cover" />
+            <img v-if="fotoUsuario" :src="fotoUsuario" alt="Foto do perfil" class="w-full h-full object-cover" />
             <UserRound v-else :size="28" :class="activeTabStyles.icon" />
           </div>
           
-          <div role="status" :aria-label="sequencia.erro.value ? 'Sequência indisponível. Tente reabrir o aplicativo.' : `Sequência de ${streakDays} dias programados: ${fogoAtivo ? 'fogo ativo' : 'congelada'}`" class="h-9 flex items-center pl-6 pr-4 -ml-5 rounded-r-full bg-whitesmoke-50 relative z-0 shadow-sm">
+          <div role="status" :aria-label="sequencia.erro.value ? 'Sequência indisponível. Tente reabrir o aplicativo.' : `Sequência ${fogoAtivo ? 'ativa' : 'congelada'}: ${streakDays} ${streakDays === 1 ? 'dia' : 'dias'}`" class="h-9 flex items-center pl-6 pr-4 -ml-5 rounded-r-full bg-whitesmoke-50 relative z-0 shadow-sm">
             <div class="flex items-center gap-1.5 translate-x-0.5">
               <Flame v-if="fogoAtivo" :size="18" class="text-orange-400 drop-shadow-sm" fill="currentColor" stroke-width="1.5" aria-hidden="true" />
-              <Snowflake v-else :size="18" class="text-cerulean-500 drop-shadow-sm" stroke-width="1.5" aria-hidden="true" />
+              <span v-else class="relative inline-flex h-5 w-5 items-center justify-center" aria-hidden="true"><Flame :size="18" class="text-cerulean-500" fill="currentColor" /><Snowflake :size="9" class="absolute -right-0.5 -top-0.5 rounded-full bg-cerulean-700 text-white" /></span>
               <span 
                 class="text-sm font-black transition-colors duration-500"
                 :class="activeTabStyles.icon"
@@ -184,24 +183,24 @@ onMounted(async () => {
         class="overflow-hidden transition-all duration-500 ease-in-out flex flex-col justify-center"
         :class="isMenuExpanded ? 'max-h-32 opacity-100 mb-8' : 'max-h-0 opacity-0'"
       >
-        <div class="flex flex-row items-center justify-center gap-2 px-4 py-2">
+        <div class="mx-auto w-full max-w-md grid grid-cols-5 items-center gap-1 px-2 py-2 sm:gap-2 sm:px-4">
           <router-link
             v-for="item in navItems"
             :key="item.path"
             :to="item.path"
             @click="isMenuExpanded = false"
-            class="flex flex-col items-center justify-center w-[4.5rem] p-3 rounded-2xl transition-all duration-300 group"
-            :class="route.path === item.path ? 'bg-whitesmoke-50/25 shadow-sm' : 'hover:bg-whitesmoke-50/10'"
+            class="flex flex-col items-center justify-center min-w-0 px-0.5 py-3 sm:px-3 rounded-2xl transition-all duration-300 group"
+            :class="caminhoAtual === item.path ? 'bg-whitesmoke-50/25 shadow-sm' : 'hover:bg-whitesmoke-50/10'"
           >
             <component 
               :is="item.icon" 
               :size="24" 
               class="mb-1.5 transition-colors duration-300"
-              :class="route.path === item.path ? 'text-whitesmoke-50' : 'text-whitesmoke-50/70 group-hover:text-whitesmoke-50'" 
+              :class="caminhoAtual === item.path ? 'text-whitesmoke-50' : 'text-whitesmoke-50/70 group-hover:text-whitesmoke-50'"
             />
             <span 
               class="text-[9px] font-bold uppercase tracking-widest transition-colors duration-300"
-              :class="route.path === item.path ? 'text-whitesmoke-50' : 'text-whitesmoke-50/70 group-hover:text-whitesmoke-50'"
+              :class="caminhoAtual === item.path ? 'text-whitesmoke-50' : 'text-whitesmoke-50/70 group-hover:text-whitesmoke-50'"
             >
               {{ item.name }}
             </span>

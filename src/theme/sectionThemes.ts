@@ -20,6 +20,9 @@ export const sectionThemes = {
     accent: 'text-teal-600',
     action: 'bg-teal-600 hover:bg-teal-700'
   },
+  evolucao: {
+    id: 'sage', header: 'bg-sage-500', pageTitle: 'text-sage-500', accent: 'text-sage-600', action: 'bg-sage-500 hover:bg-sage-600'
+  },
   perfil: {
     id: 'bubblegum',
     header: 'bg-bubblegum-500',

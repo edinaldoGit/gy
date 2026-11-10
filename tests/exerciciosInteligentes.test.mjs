@@ -147,12 +147,12 @@ test('compartilhamento v3 conserva identidade, aceita v2 e não incorpora substi
   assert.equal(validarDocumentoFichas(v2).exercicios[0].nome,deck.nome)
 })
 
-test('backup v3 preserva substituição e histórico global; v1 e v2 continuam aceitos', async () => {
+test('backup v4 preserva substituição e histórico global; v1 e v2 continuam aceitos', async () => {
   const ex=realizado(trocarExercicio(slot(),polia))
   const tabelas={perfil:[],catalogo:cat,fichas:[],treinos:[],configuracoes:[],programacoes:[],historico:[sessao(1,'2026-11-09T15:00:00Z',ex)]}
   let recuperado
   const backup=await exportarBackup({lerSnapshot:async()=>tabelas,substituir:async()=>{}},agora)
-  assert.equal(backup.versao,3)
+  assert.equal(backup.versao,4)
   await restaurarBackup({lerSnapshot:async()=>tabelas,substituir:async t=>{recuperado=t}},backup)
   assert.deepEqual(recuperado,{...tabelas,medidasCorporais:[]})
   assert.equal(execucoesDoExercicio(recuperado.historico,recuperado.catalogo,polia.exercicioCanonicoId,agora)[0].series.length,3)

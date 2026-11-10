@@ -15,6 +15,7 @@ let registro
 const copia = value => structuredClone(value)
 let registros = []
 const fake = {
+  async toArray() { return registros.map(copia) },
   where() { return { equals(estado) { return { async first() { const row = registros.find(item => item.estado === estado); return row ? copia(row) : undefined }, async toArray() { return registros.filter(item => item.estado === estado).map(copia) } } } } },
   async add(dados) { registro = { ...copia(dados), id: registros.length + 1 }; registros.push(registro); return registro.id },
   async get(id) { const row = registros.find(item => item.id === id); return row ? copia(row) : undefined },
@@ -24,8 +25,8 @@ Object.defineProperty(db, 'historico', { value: fake, configurable: true })
 db.transaction = async (...args) => args.at(-1)()
 const memoria = new Map()
 Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: key => memoria.get(key) ?? null, setItem: (key, value) => memoria.set(key, value), removeItem: key => memoria.delete(key) } })
-async function iniciar(t) {
-  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] })
+async function iniciar(t, instante) {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', ...(instante ? ['Date'] : [])], ...(instante ? { now: instante.getTime() } : {}) })
   registro = undefined
   registros = []
   memoria.clear()
@@ -222,4 +223,54 @@ test('duas tentativas concorrentes executam somente um cancelamento', async t =>
   const resultados = await Promise.all([store.cancelarTreino(), store.cancelarTreino()])
   assert.deepEqual(resultados.sort(), [false, true])
   assert.equal(registro.estado, 'cancelado')
+})
+
+
+test('finalização bloqueia uma segunda sessão mesmo em outra store ou ficha', async t => {
+  const store = await iniciar(t)
+  store.concluirTodasSeries('ex_0')
+  assert.equal(await store.finalizarTreino(), true)
+  const antes = copia(registros)
+  setActivePinia(createPinia())
+  const outra = useTreinoStore()
+  outra.catalogo = store.catalogo
+  assert.equal(await outra.iniciarTreino({ ...treino(), id: 9, fichaId: 9 }), false)
+  assert.equal(outra.treinoFinalizadoHoje, true)
+  assert.equal(outra.estadoAtual, 'preview')
+  assert.deepEqual(registros, antes)
+})
+
+test('não finaliza se outra sessão já ocupa o dia e preserva a sessão recuperável', async t => {
+  t.mock.method(console, 'error', () => {})
+  const store = await iniciar(t)
+  store.concluirTodasSeries('ex_0')
+  registros.push({ ...copia(registro), id: 99, estado: 'finalizado', dataFim: new Date() })
+  assert.equal(await store.finalizarTreino(), false)
+  assert.equal((await fake.get(store.sessaoId)).estado, 'em_andamento')
+})
+
+
+test('sessão atravessando meia-noite conta no dia da conclusão e libera no dia seguinte', async t => {
+  const store = await iniciar(t, new Date(2026,10,2,23,59))
+  t.mock.timers.setTime(new Date(2026,10,3,0,1).getTime())
+  store.concluirTodasSeries('ex_0')
+  assert.equal(await store.finalizarTreino(), true)
+  assert.equal(registro.diaConclusaoLocal, '2026-11-03')
+  assert.equal(await store.iniciarTreino(treino()), false)
+  t.mock.timers.setTime(new Date(2026,10,4,0,1).getTime())
+  await store.atualizarLimiteDiario()
+  assert.equal(store.treinoFinalizadoHoje, false)
+  assert.equal(await store.iniciarTreino(treino()), true)
+  await store.cancelarTreino()
+})
+
+test('conclusão em outra aba encerra a execução local e bloqueia novo treino', async t => {
+  const store=await iniciar(t)
+  registro.estado='finalizado'
+  registro.dataFim=new Date()
+  await store.atualizarLimiteDiario()
+  assert.equal(store.estadoAtual,'preview')
+  assert.equal(store.treinoFinalizadoHoje,true)
+  assert.equal(store.sessaoEstado,'finalizado')
+  assert.equal(await store.persistirSessaoAgora(),false)
 })

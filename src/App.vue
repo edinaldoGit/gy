@@ -41,22 +41,26 @@ pararPwaRuntime = iniciarPwaRuntime()
 pararVerificacoes = conexaoRegistro.stop
 watch(pwa.needRefresh, conexaoRegistro.sincronizarPendente, { immediate: true })
 const coresSistema: Record<string, string> = {
-  treino: '#9b44bb', fichas: '#2680a6', historico: '#3f868d', perfil: '#fc6471'
+  treino: '#9b44bb', fichas: '#2680a6', historico: '#3f868d', perfil: '#fc6471', evolucao: '#3f795f', onboarding: '#fc6471'
 }
 const coresFeedback: Record<string, string> = { success: '#72b9c0', error: '#fc7a86', warning: '#fcd34d', info: '#59b3d9' }
-watch([() => route.path, feedback.current], ([path, mensagem]) => {
+watch([() => route.path, feedback.current, () => !!state.value.options], ([path, mensagem, confirmando]) => {
+  if (confirmando) mensagem = null
   const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
   if (!meta) return
-  const secao = path === '/fichas' ? 'fichas' : path === '/historico' ? 'historico' : path === '/perfil' ? 'perfil' : 'treino'
+  path = path.replace(/\/$/, '') || '/'
+  if (path === '/onboarding') mensagem = null
+  const secao = path === '/fichas' ? 'fichas' : path === '/historico' ? 'historico' : path === '/perfil' ? 'perfil' : path === '/evolucao' ? 'evolucao' : path === '/onboarding' ? 'onboarding' : 'treino'
   meta.content = mensagem ? coresFeedback[mensagem.kind] ?? coresSistema[secao] : coresSistema[secao]
+  document.documentElement.style.setProperty('--gy-system-color', meta.content)
 }, { immediate: true })
 watch(modalAberto, aberto => feedback.pause('modal', aberto))
 const visibility = () => feedback.pause('hidden', document.hidden)
-watch(() => route.path === '/onboarding', hidden => feedback.pause('no-surface', hidden), { immediate: true })
+watch(() => route.name === 'Onboarding', hidden => feedback.pause('no-surface', hidden), { immediate: true })
 watch(() => !!state.value.options, open => feedback.pause('confirmation', open), { flush: 'sync' })
 onMounted(() => {
   void router.isReady().then(() => {
-    if (route.path !== '/' && route.path !== '/onboarding') void treino.carregarTreinoDoDia()
+    if (route.path !== '/' && route.name !== 'Onboarding') void treino.carregarTreinoDoDia()
   })
   pararSequencia = sequencia.iniciar()
   pararCoordenacaoBackup = iniciarCoordenacaoBackup(async () => {
@@ -90,11 +94,11 @@ onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwa
 <template>
   <div class="flex h-dvh flex-col overflow-hidden bg-whitesmoke-50">
     
-    <div v-if="route.path !== '/onboarding'" class="relative z-[100] shrink-0" :inert="modalAberto || !!state.options || restauracaoBloqueada"><TopBar /></div>
+    <div v-if="route.name !== 'Onboarding'" class="relative z-[100] shrink-0" :inert="modalAberto || !!state.options || restauracaoBloqueada"><TopBar /></div>
 
     <div class="relative isolate z-0 min-h-0 flex-1 [container-type:size]">
 
-    <main tabindex="-1" :inert="!!state.options || restauracaoBloqueada" class="h-full min-h-0 overflow-y-auto px-4 pb-[calc(1rem+env(safe-area-inset-bottom))]" :class="{ '!overflow-hidden': !!state.options }">
+    <main tabindex="-1" :inert="!!state.options || restauracaoBloqueada" class="h-full min-h-0 overflow-y-auto px-4 pb-4 bg-whitesmoke-50" :class="{ '!overflow-hidden': !!state.options }">
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
@@ -103,6 +107,7 @@ onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwa
     </main>
     <ConfirmDialog />
     </div>
+    <div class="shrink-0 h-[env(safe-area-inset-bottom)]" style="background-color: var(--gy-system-color)" aria-hidden="true"></div>
 
   </div>
 </template>
