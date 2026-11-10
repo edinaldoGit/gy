@@ -145,3 +145,10 @@ A cor da área de gestos é solicitada pelas superfícies web disponíveis; a de
 O invólucro da TopBar tem novamente o fundo Whitesmoke, expondo seus cantos inferiores arredondados. A área inferior passa a ter uma superfície fixa presa à borda da viewport, separada do conteúdo e sem interceptar toques, com reserva equivalente de espaço. Usa o maior inset inferior disponível (atual ou máximo), preservando o fundo durante mudanças da área segura. A cor continua sincronizada com a TopBar.
 
 A versão 0.1.1 não resolveu a barra nativa no aparelho relatado pelo usuário. Este ajuste cobre a área segura desenhável pela página; não há API web para impor a cor de uma barra nativa que a versão do navegador mantém fora da viewport. O manifesto continua estável para preservar identidade e atualização da instalação existente. Se o sistema mantiver a cor rosa, é necessária a identificação de SO, versão do navegador e modo instalado/navegador antes de declarar a barra nativa corrigida.
+
+
+## Ajuste 0.1.3 — barra de status no iOS
+
+A meta Apple `apple-mobile-web-app-status-bar-style` muda de `default` para `black-translucent`, permitindo que a PWA aberta pela Tela de Início desenhe o fundo atrás da barra de status. A TopBar já reserva `safe-area-inset-top` e pinta essa região com a cor da seção/feedback; o fundo claro atrás dos cantos arredondados permanece. A alteração não modifica CSS, insets, manifesto ou `theme-color` usados no Android.
+
+Referência oficial: https://developer.apple.com/library/archive/documentation/AppleApplications/Reference/SafariHTMLRef/Articles/MetaTags.html. A configuração Apple é específica do modo standalone; não promete controlar a interface do Safari em uma aba. A apresentação final varia com a versão do iOS e exige conferência física. A instalação existente pode precisar ser encerrada e reaberta para o sistema reler a configuração; não é necessário apagar dados do aplicativo.
