@@ -3,11 +3,12 @@ import { feedback } from '@/composables/useFeedback'
 import { confirmation } from '@/composables/useConfirm'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { db } from '@/database/db'
 import { UserRound, Ruler, Weight, CalendarDays, Activity, Trash2, Pencil } from 'lucide-vue-next'
 import SectionPageHeader from '@/components/layout/SectionPageHeader.vue'
 import BackupDados from '@/components/perfil/BackupDados.vue'
-import { comGravacaoGy } from '@/database/writeLock'
+import { operacaoBackupBloqueada, iniciarRestauracaoExclusiva, restauracaoBloqueada } from '@/services/backupCoordinator'
+import { excluirDadosDaConta } from '@/services/exclusaoConta'
+import { useTreinoStore } from '@/stores/treinoStore'
 import EditarPerfil from '@/components/perfil/EditarPerfil.vue'
 import { usePerfilAtual } from '@/composables/usePerfilAtual'
 import AplicativoGy from '@/components/perfil/AplicativoGy.vue'
@@ -15,6 +16,7 @@ import AplicativoGy from '@/components/perfil/AplicativoGy.vue'
 const router = useRouter()
 const { perfil: usuario, carregando: carregandoPerfil } = usePerfilAtual()
 const editando = ref(false)
+const treino = useTreinoStore()
 
 const imc = computed(() => {
   if (!usuario.value) return '0.0'
@@ -32,14 +34,37 @@ const dataCriacao = computed(() => {
 })
 
 const apagarDados = async () => {
+  let coordenacao: Awaited<ReturnType<typeof iniciarRestauracaoExclusiva>> | null = null
+  let exclusaoConcluida = false
   const confirmado = await confirmation.ask({
-    title: 'Excluir seus dados de perfil?',
-    message: 'Seu nome, foto, idade, peso e altura serão removidos deste dispositivo. Essa ação não poderá ser desfeita.',
-    details: 'Fichas, treinos e histórico permanecerão armazenados. Você voltará ao cadastro inicial.',
-    variant: 'error', icon: 'trash', cancelText: 'Manter perfil', confirmText: 'Excluir perfil',
-    action: () => comGravacaoGy(() => db.perfil.clear())
+    title: 'Apagar todos os dados?',
+    message: 'Isso removerá permanentemente seu perfil, suas fichas, treinos, histórico e registros de evolução deste dispositivo. Essa ação não pode ser desfeita sem um backup.',
+    details: 'Exporte um backup antes de continuar se quiser guardar uma cópia. O catálogo oficial de exercícios e os recursos do Gy serão mantidos.',
+    variant: 'error', icon: 'trash', cancelText: 'Manter meus dados', confirmText: 'Apagar tudo',
+    action: async () => {
+      operacaoBackupBloqueada.value = true
+      try {
+        coordenacao = await iniciarRestauracaoExclusiva()
+        restauracaoBloqueada.value = true
+        await treino.pausarParaBackup()
+        await coordenacao.bloquearGravacoes()
+        await excluirDadosDaConta()
+        exclusaoConcluida = true
+        coordenacao.concluir()
+        return true
+      } catch (erro) {
+        coordenacao?.cancelar()
+        treino.retomarAposBackup()
+        throw erro
+      } finally {
+        operacaoBackupBloqueada.value = false
+      }
+    }
   })
-  if (confirmado) { feedback.success('Dados de perfil excluídos.'); await router.push('/onboarding') }
+  if (confirmado && exclusaoConcluida) {
+    feedback.success('Todos os dados desta conta foram apagados.')
+    window.location.replace(router.resolve('/onboarding').href)
+  }
 }
 </script>
 
@@ -127,10 +152,10 @@ const apagarDados = async () => {
         class="w-full bg-white border border-red-100 text-red-500 hover:bg-red-50 font-bold py-4 rounded-2xl flex items-center justify-center transition-all shadow-sm active:scale-[0.98]"
       >
         <Trash2 :size="20" class="mr-2" />
-        Excluir dados do perfil
+        Apagar todos os dados
       </button>
       <p class="text-[10px] text-center text-whitesmoke-400 mt-3 px-4">
-        Remove somente seus dados de perfil. Fichas, treinos e histórico permanecem neste dispositivo.
+        Apaga perfil, fichas, treinos, histórico, medidas e cargas deste dispositivo.
       </p>
     </div>
 

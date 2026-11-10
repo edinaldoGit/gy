@@ -58,6 +58,7 @@ watch([() => route.path, feedback.current, () => !!state.value.options], ([path,
 }, { immediate: true })
 watch(modalAberto, aberto => feedback.pause('modal', aberto))
 const visibility = () => feedback.pause('hidden', document.hidden)
+const dadosInvalidados = () => window.location.replace(router.resolve('/onboarding').href)
 watch(() => route.name === 'Onboarding', hidden => feedback.pause('no-surface', hidden), { immediate: true })
 watch(() => !!state.value.options, open => feedback.pause('confirmation', open), { flush: 'sync' })
 onMounted(() => {
@@ -72,6 +73,7 @@ onMounted(() => {
   }, treino.retomarAposBackup)
   visibility()
   document.addEventListener('visibilitychange', visibility)
+  window.addEventListener('gy:dados-invalidados', dadosInvalidados)
   interval = setInterval(feedback.tick, 50)
   if (navigator.onLine) setTimeout(() => { ultimaVerificacao = Date.now(); void verificarAtualizacoes() }, 2500)
   const verificarAoVoltar = () => {
@@ -90,7 +92,7 @@ onMounted(() => {
   window.addEventListener('online', verificarConexao)
   pararVerificacoes = () => { conexaoRegistro.stop(); clearInterval(timerAtualizacoes); document.removeEventListener('visibilitychange', verificarAoVoltar); window.removeEventListener('online', verificarConexao) }
 })
-onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwaRuntime?.(); pararVerificacoes?.(); clearInterval(interval); document.removeEventListener('visibilitychange', visibility) })
+onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwaRuntime?.(); pararVerificacoes?.(); clearInterval(interval); document.removeEventListener('visibilitychange', visibility); window.removeEventListener('gy:dados-invalidados', dadosInvalidados) })
 </script>
 
 <template>

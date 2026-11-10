@@ -1,6 +1,6 @@
 import { shallowRef } from 'vue'
 import { gravacoesBackupBloqueadas, obterBloqueioExclusivoGy } from '../database/writeLock'
-import { CHAVE_RASCUNHO_SESSAO } from '../utils/exercicioSessao'
+import { limparArmazenamentoTemporarioGy } from '../utils/armazenamentoGy'
 
 const canalNome = 'gy-backup-restauracao-v1'
 const idAba = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
@@ -53,7 +53,7 @@ const receber = (evento: MessageEvent<Mensagem>) => {
   } else if (mensagem.tipo === 'done') {
     restauracaoBloqueada.value = true
     gravacoesBackupBloqueadas.value = true
-    try { sessionStorage.removeItem(CHAVE_RASCUNHO_SESSAO) } catch { }
+    limparArmazenamentoTemporarioGy()
     window.location.reload()
   }
 }
