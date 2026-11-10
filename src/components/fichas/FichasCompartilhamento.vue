@@ -49,10 +49,14 @@ watch(() => route.hash, async hash => {
   finally { await router.replace({ path: route.path, query: route.query, hash: '' }) }
 }, { immediate: true })
 async function compartilharNativo() {
-  if (!arquivoNativo.value || processando.value) return
+  if (!arquivoNativo.value || processando.value) return 'falha' as const
   processando.value = true
-  try { if (await compartilharArquivo(arquivoNativo.value) === 'compartilhado') { feedback.success('Ficha entregue ao compartilhamento do dispositivo.'); exportacaoAberta.value = false } }
-  catch { feedback.error('Não foi possível compartilhar. Tente exportar o arquivo.') }
+  try {
+    const resultado = await compartilharArquivo(arquivoNativo.value)
+    if (resultado === 'compartilhado') { feedback.success('Ficha entregue ao compartilhamento do dispositivo.'); exportacaoAberta.value = false }
+    return resultado
+  }
+  catch { return 'falha' as const }
   finally { processando.value = false }
 }
 async function gerarLink() {
@@ -82,11 +86,17 @@ const alternarFicha = (id: number, marcado: boolean) => {
     : idsSelecionados.value.filter(atual => atual !== id)
 }
 
-const exportarSelecionadas = () => {
+const exportarSelecionadas = async () => {
+  let compartilharFalhou = false
+  if (nativoDisponivel.value) {
+    const resultado = await compartilharNativo()
+    if (resultado !== 'falha') return
+    compartilharFalhou = true
+  }
   try {
     baixarFichas(fichasSelecionadas.value, catalogo.value)
     aviso.value = ''
-    feedback.info('Download do arquivo iniciado.')
+    feedback.info(compartilharFalhou ? 'O compartilhamento não abriu; o arquivo foi preparado para download.' : 'Download do arquivo iniciado.')
     erro.value = ''
     exportacaoAberta.value = false
   } catch (falha) {
@@ -189,14 +199,14 @@ const fecharPrevia = () => {
         </template>
       </div>
       <div v-if="fichasSelecionadas.length" class="shrink-0 border-t border-whitesmoke-200 p-4 flex flex-col gap-2">
-        <button v-if="nativoDisponivel" type="button" :disabled="processando" class="min-h-11 rounded-xl bg-cerulean-600 p-3 text-sm font-bold text-white disabled:opacity-50" @click="compartilharNativo">{{ processando ? 'Compartilhando…' : 'Compartilhar pelo celular' }}</button>
         <button v-if="podeGerarLink" type="button" :disabled="linkOcupado" class="min-h-11 rounded-xl bg-cerulean-50 p-3 text-sm font-bold text-cerulean-800" @click="gerarLink">{{ linkOcupado ? 'Preparando…' : 'Gerar link de importação' }}</button>
         <div v-if="linkGerado" class="flex flex-col gap-2"><label class="text-xs font-bold text-cerulean-800">Link da ficha<input :value="linkGerado" readonly class="mt-1 min-h-11 w-full rounded-xl border border-whitesmoke-200 bg-white px-3 text-xs" @focus="($event.target as HTMLInputElement).select()" /></label><button type="button" class="min-h-11 rounded-xl border border-cerulean-200 text-sm font-bold text-cerulean-800" @click="copiarLink">Copiar link</button></div>
       </div>
       <footer class="flex shrink-0 gap-3 border-t border-whitesmoke-200 bg-whitesmoke-50 p-6">
         <button type="button" class="min-h-11 flex-1 rounded-xl border border-whitesmoke-200 px-4 text-sm font-bold text-whitesmoke-700 hover:bg-whitesmoke-50" @click="exportacaoAberta = false">Cancelar</button>
-        <button type="button" :disabled="!fichasSelecionadas.length" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-cerulean-600 px-4 text-sm font-bold text-white transition hover:bg-cerulean-700 disabled:cursor-not-allowed disabled:opacity-50" @click="exportarSelecionadas">
-          <Download :size="16" /> Exportar {{ fichasSelecionadas.length || '' }}
+        <button type="button" :disabled="!fichasSelecionadas.length || processando" class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-cerulean-600 px-4 text-sm font-bold text-white transition hover:bg-cerulean-700 disabled:cursor-not-allowed disabled:opacity-50" @click="exportarSelecionadas">
+          <component :is="nativoDisponivel ? Share2 : Download" :size="16" />
+          {{ processando ? 'Compartilhando…' : nativoDisponivel ? 'Compartilhar' : 'Exportar' }} {{ fichasSelecionadas.length || '' }}
         </button>
       </footer>
     </section>
