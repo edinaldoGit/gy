@@ -96,7 +96,7 @@ onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwa
 <template>
   <div class="flex h-dvh flex-col overflow-hidden" style="background-color: var(--gy-system-color)">
     
-    <div v-if="route.name !== 'Onboarding'" class="relative z-[100] shrink-0" :inert="modalAberto || !!state.options || restauracaoBloqueada"><TopBar /></div>
+    <div v-if="route.name !== 'Onboarding'" class="relative z-[100] shrink-0 bg-whitesmoke-50" :inert="modalAberto || !!state.options || restauracaoBloqueada"><TopBar /></div>
 
     <div class="relative isolate z-0 min-h-0 flex-1 [container-type:size]">
 
@@ -109,7 +109,8 @@ onBeforeUnmount(() => { pararSequencia?.(); pararCoordenacaoBackup?.(); pararPwa
     </main>
     <ConfirmDialog />
     </div>
-    <div class="shrink-0 h-[env(safe-area-inset-bottom)]" style="background-color: var(--gy-system-color)" aria-hidden="true"></div>
+    <div class="gy-gesture-space" aria-hidden="true"></div>
+    <div class="gy-gesture-background" aria-hidden="true"></div>
 
   </div>
 </template>

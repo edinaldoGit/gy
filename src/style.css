@@ -146,3 +146,22 @@
 }
 
 html, body, #app { background-color: var(--gy-system-color, #fc6471); }
+
+
+:root {
+  --gy-gesture-inset: max(env(safe-area-inset-bottom, 0px), env(safe-area-max-inset-bottom, 0px));
+}
+.gy-gesture-space {
+  flex-shrink: 0;
+  height: var(--gy-gesture-inset);
+  background-color: var(--gy-system-color);
+}
+.gy-gesture-background {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  height: var(--gy-gesture-inset);
+  background-color: var(--gy-system-color);
+  pointer-events: none;
+  z-index: 1000;
+}

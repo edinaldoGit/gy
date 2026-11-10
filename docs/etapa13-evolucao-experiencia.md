@@ -138,3 +138,10 @@ A versão 0.1.0 mantém a atualização controlada da Etapa 12C. O commit de imp
 O contêiner principal deixa de pintar branco atrás da área inferior e usa a mesma cor dinâmica da TopBar. A sincronização também aplica a cor explicitamente nos fundos de `html` e `body`, além de `theme-color`, da variável CSS e da faixa de safe area existente. O conteúdo permanece claro e o espaço reservado à área segura é preservado. Feedbacks acompanham a mesma cor transitória da TopBar. Não há alteração da estratégia de atualização ou dos dados.
 
 A cor da área de gestos é solicitada pelas superfícies web disponíveis; a decisão final continua pertencendo ao navegador e ao sistema operacional. Referências: https://developer.chrome.com/docs/css-ui/edge-to-edge e https://webkit.org/blog/7929/designing-websites-for-iphone-x/. A barra nativa deve ser conferida em aparelho físico; uma viewport de desktop não a reproduz.
+
+
+## Correção 0.1.2 — superfícies independentes
+
+O invólucro da TopBar tem novamente o fundo Whitesmoke, expondo seus cantos inferiores arredondados. A área inferior passa a ter uma superfície fixa presa à borda da viewport, separada do conteúdo e sem interceptar toques, com reserva equivalente de espaço. Usa o maior inset inferior disponível (atual ou máximo), preservando o fundo durante mudanças da área segura. A cor continua sincronizada com a TopBar.
+
+A versão 0.1.1 não resolveu a barra nativa no aparelho relatado pelo usuário. Este ajuste cobre a área segura desenhável pela página; não há API web para impor a cor de uma barra nativa que a versão do navegador mantém fora da viewport. O manifesto continua estável para preservar identidade e atualização da instalação existente. Se o sistema mantiver a cor rosa, é necessária a identificação de SO, versão do navegador e modo instalado/navegador antes de declarar a barra nativa corrigida.
