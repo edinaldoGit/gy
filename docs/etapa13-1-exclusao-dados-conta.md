@@ -37,4 +37,4 @@ A limpeza da sessionStorage é local a cada aba; as abas abertas participam do p
 
 ## Publicação
 
-A versão foi atualizada de 0.1.3 para 0.1.4. Commit, push, execução do workflow e URL pública serão registrados após as verificações finais desta entrega.
+A versão foi atualizada de 0.1.3 para 0.1.4 e enviada para `origin/main` no commit `390c294`, sem force push. O [workflow 42752115458](https://github.com/edinaldoGit/gy/actions/runs/42752115458) concluiu com sucesso. Em 10/11/2026, a página principal, Perfil, Fichas, Histórico, Evolução, service worker e manifesto responderam HTTP 200. O bundle publicado contém a versão 0.1.4 e a proteção `gy:geracao-dados`. URL: https://edinaldogit.github.io/gy/.
