@@ -102,14 +102,14 @@ const abrirFoguinho = (evento: MouseEvent) => {
         
         <!-- Esquerda: Perfil + Ofensiva -->
         <div class="flex min-w-0 flex-1 items-center justify-start">
-          <div class="relative z-10 h-14 w-14 shrink-0 overflow-visible">
+          <div class="foguinho-profile-group relative z-10 flex shrink-0 items-center gap-2">
             <button type="button" aria-label="Abrir progresso do foguinho" class="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-full border-2 border-whitesmoke-50 bg-whitesmoke-50 shadow-sm transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" :class="{'ring-4 ring-whitesmoke-50/30': isWorkoutActive}" @click="abrirFoguinho">
               <img v-if="fotoUsuario" :src="fotoUsuario" alt="" class="h-full w-full object-cover" />
               <UserRound v-else :size="28" :class="activeTabStyles.icon" aria-hidden="true" />
             </button>
-            <button type="button" :aria-label="badgeLabel" class="foguinho-badge absolute -bottom-3 -right-4 z-20 flex h-11 w-11 items-center justify-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-whitesmoke-950" :class="chama === 5 ? 'foguinho-badge-prime' : ''" :style="chama === 5 ? undefined : { '--foguinho-cor': ['#54BDF2', '#F89337', '#E5A523', '#F35F52', '#D94C9D'][chama] || '#54BDF2' }" @click.stop="abrirFoguinho">
-              <FoguinhoChama class="foguinho-badge-flame" :nivel="chama" :tamanho="29" :animar="chama === 5" />
+            <button type="button" :aria-label="badgeLabel" class="foguinho-badge relative flex h-14 w-8 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" :style="{ '--foguinho-cor': ['#54BDF2', '#F89337', '#E5A523', '#F35F52', '#D94C9D', '#BB7BFF'][chama] || '#54BDF2' }" @click.stop="abrirFoguinho">
               <span class="foguinho-badge-count" :class="treinosNoCiclo >= 10 ? 'foguinho-badge-count-wide' : ''">{{ treinosNoCicloExibidos }}</span>
+              <FoguinhoChama :nivel="chama" :tamanho="21" :animar="chama === 5" />
             </button>
           </div>
         </div>
@@ -243,11 +243,10 @@ const abrirFoguinho = (evento: MouseEvent) => {
 .topbar-normal-hidden > div:first-child { transform: translateX(24px) scale(.88); }
 .topbar-normal-hidden > div:nth-child(2) { transform: translateY(-18px) scale(.8); }
 .topbar-normal-hidden > div:last-child { transform: translateX(-24px) scale(.88); }
-.foguinho-badge::before { position: absolute; inset: 4px; content: ''; border: 1.5px solid white; border-radius: 50%; background: color-mix(in srgb, var(--foguinho-cor, #54bdf2) 16%, white); box-shadow: 0 1px 4px rgb(18 24 38 / .15); pointer-events: none; }
-.foguinho-badge-prime::before { background: linear-gradient(145deg, #f3e8ff, #fff 70%, #efcaff); }
-.foguinho-badge-flame { position: relative; z-index: 1; transform: translateY(-1px); }
-.foguinho-badge-count { position: absolute; z-index: 2; left: 50%; bottom: 8px; color: white; font-family: 'Fredoka', sans-serif; font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; transform: translateX(-50%); -webkit-text-stroke: .8px #573849; paint-order: stroke fill; text-shadow: 0 1px 1px rgb(41 24 36 / .7), 0 0 2px rgb(255 255 255 / .75); pointer-events: none; }
-.foguinho-badge-count-wide { font-size: 9px; letter-spacing: -.35px; }
+.foguinho-badge::before { position: absolute; inset: 0 -6px; content: ''; border-radius: inherit; }
+.foguinho-badge-count { color: var(--foguinho-cor); font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 600; line-height: 1; white-space: nowrap; pointer-events: none; }
+.foguinho-badge-count-wide { font-size: 13px; letter-spacing: -.3px; }
+@media (max-width: 359px) { .foguinho-profile-group { gap: 4px; } .foguinho-badge { width: 28px; } .foguinho-badge::before { left: -2px; right: -14px; } }
 .feedback-enter-active { transition: opacity .28s ease .18s, transform .36s cubic-bezier(.22,1,.36,1) .18s; }
 .feedback-leave-active { transition: opacity .18s ease, transform .2s ease; pointer-events: none; }
 .feedback-enter-from { opacity: 0; transform: translateY(16px) scale(.96); }
