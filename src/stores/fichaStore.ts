@@ -7,6 +7,7 @@ import { comGravacaoGy } from '@/database/writeLock'
 import { novaIdentidadePersonalizada } from '@/utils/identidadeExercicio'
 import { diaDaConclusao } from '@/utils/limiteDiario'
 import { diaLocal } from '@/utils/diasLocais'
+import { corOcupada, validarCorTreino } from '@/utils/coresTreino'
 import { filtrarCatalogo } from '@/utils/catalogo'
 
 type ModoFicha = 'lista' | 'detalhe' | 'step1' | 'treino-info' | 'step2' | 'step3'
@@ -36,7 +37,10 @@ export const useFichaStore = defineStore('ficha', () => {
     { id: 'emerald', bg: 'bg-emerald-500', text: 'text-emerald-500', light: 'bg-emerald-50' },
     { id: 'bubblegum', bg: 'bg-bubblegum-500', text: 'text-bubblegum-500', light: 'bg-bubblegum-50' },
     { id: 'orange', bg: 'bg-orange-500', text: 'text-orange-500', light: 'bg-orange-50' },
-    { id: 'rose', bg: 'bg-rose-500', text: 'text-rose-500', light: 'bg-rose-50' }
+    { id: 'rose', bg: 'bg-rose-500', text: 'text-rose-500', light: 'bg-rose-50' },
+    { id: 'indigo', bg: 'bg-indigo-500', text: 'text-indigo-500', light: 'bg-indigo-50' },
+    { id: 'amber', bg: 'bg-amber-600', text: 'text-amber-600', light: 'bg-amber-50' },
+    { id: 'slate', bg: 'bg-slate-600', text: 'text-slate-600', light: 'bg-slate-50' }
   ]
   const fichaEditando = ref<Partial<Ficha> & { treinos: Treino[] }>({ nome: '', foco: '', corTema: 'cerulean', origem: 'local', criadoEm: new Date(), atualizadoEm: new Date(), treinos: [] })
   const treinoEditando = ref<TreinoRascunho>({ nome: '', foco: '', ordem: 1, corTema: 'cerulean', diasDaSemana: [], exercicios: [] })
@@ -45,11 +49,11 @@ export const useFichaStore = defineStore('ficha', () => {
   const fichaAtual = computed(() => fichasSalvas.value.find(ficha => ficha.id === fichaAtivaId.value) ?? null)
   const fichasBiblioteca = computed(() => fichasSalvas.value.filter(ficha => ficha.id !== fichaAtivaId.value && (filtroOrigem.value === 'todas' || ficha.origem === filtroOrigem.value)))
   const diasOcupados = computed(() => [] as number[])
-  const corEstaEmUso = (_idCor: string) => false
+  const corEstaEmUso = (idCor: string) => corOcupada((fichaSelecionada.value?.treinos ?? []).map(t => ({ ...t, corTema: t.corTema || fichaSelecionada.value?.corTema || 'cerulean' })), idCor, treinoEditando.value.id)
   const getCorObj = (idCor: string) => paletaCores.find(cor => cor.id === idCor) || paletaCores[1]
   const exerciciosAgrupados = computed(() => {
     const grupos: Record<string, ExercicioCatalogo[]> = {}
-    catalogo.value.forEach(ex => (grupos[ex.grupoMuscular] ||= []).push(ex))
+    catalogo.value.filter(ex => !ex.arquivado).forEach(ex => (grupos[ex.grupoMuscular] ||= []).push(ex))
     return grupos
   })
   const resultadosBusca = computed(() => {
@@ -149,14 +153,14 @@ export const useFichaStore = defineStore('ficha', () => {
   }
   const prepararNovoTreino = () => {
     const treinosExistentes = fichaSelecionada.value && fichaSelecionada.value.id === fichaEditando.value.id ? fichaSelecionada.value.treinos : []
-    treinoEditando.value = { nome: '', foco: '', ordem: (treinosExistentes?.length || 0) + 1, corTema: 'cerulean', diasDaSemana: [], exercicios: [] }
+    treinoEditando.value = { nome: '', foco: '', ordem: (treinosExistentes?.length || 0) + 1, corTema: paletaCores.find(c => !fichaSelecionada.value?.treinos.some(t => t.corTema === c.id))?.id || 'cerulean', diasDaSemana: [], exercicios: [] }
     termoBusca.value = ''
     contextoWizard.value = 'novo-treino'
   }
   const adicionarTreino = () => {
     if (!fichaSelecionada.value?.id) return abrirEdicaoFicha(fichaSelecionada.value)
     fichaEditando.value = { ...fichaSelecionada.value, treinos: fichaSelecionada.value.treinos }
-    treinoEditando.value = { nome: '', foco: '', ordem: fichaSelecionada.value.treinos.length + 1, corTema: 'cerulean', diasDaSemana: [], exercicios: [] }
+    treinoEditando.value = { nome: '', foco: '', ordem: fichaSelecionada.value.treinos.length + 1, corTema: paletaCores.find(c => !fichaSelecionada.value?.treinos.some(t => t.corTema === c.id))?.id || 'cerulean', diasDaSemana: [], exercicios: [] }
     termoBusca.value = ''
     contextoWizard.value = 'novo-treino'
     modo.value = 'treino-info'
@@ -192,6 +196,8 @@ export const useFichaStore = defineStore('ficha', () => {
       criadoEm: anterior?.criadoEm || agora, atualizadoEm: agora
     }
     await comGravacaoGy(() => db.transaction('rw', db.treinos, db.configuracoes, db.fichas, db.programacoes, db.historico, async () => {
+      const ficha = await db.fichas.get(fichaId)
+      validarCorTreino((await db.treinos.where('fichaId').equals(fichaId).toArray()).map(t => ({ ...t, corTema: t.corTema || ficha?.corTema || 'cerulean' })), treino.corTema!, treino.id)
       await db.treinos.put(treino)
       if ((await db.configuracoes.get('principal'))?.fichaAtivaId === fichaId) await registrarProgramacao(fichaId, 'edicao')
     }))
@@ -267,7 +273,7 @@ export const useFichaStore = defineStore('ficha', () => {
   const deletarFichaSelecionada = async () => { if (fichaSelecionada.value) await excluirFicha(fichaSelecionada.value) }
   const editarFichaSelecionada = () => abrirEdicaoFicha()
   const toggleExercicio = (exCatalogo: ExercicioCatalogo) => {
-    if (exCatalogo.id == null) return
+    if (exCatalogo.id == null || exCatalogo.arquivado) return
     const lista = treinoEditando.value.exercicios
     const index = lista.findIndex(ex => ex.exercicioId === exCatalogo.id)
     if (index >= 0) lista.splice(index, 1)

@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useFichaStore } from '@/stores/fichaStore'
 
+import GerenciarExercicios from '@/components/fichas/GerenciarExercicios.vue'
 import FichaList from '@/components/fichas/FichaList.vue'
 import TreinoWizardInfo from '@/components/fichas/TreinoWizardInfo.vue'
 import FichaWizardInfo from '@/components/fichas/FichaWizardInfo.vue'
@@ -32,6 +33,7 @@ onMounted(() => {
     <FichaWizardCatalogo v-else-if="modo === 'step2'" />
     <FichaWizardAjustes v-else-if="modo === 'step3'" />
 
+    <GerenciarExercicios />
     <Transition name="gy-modal" :duration="{ enter: 420, leave: 280 }" appear><CriarExercicioModal v-if="modalCriarExAberto" /></Transition>
   </div>
 </template>

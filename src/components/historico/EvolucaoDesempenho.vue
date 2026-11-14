@@ -1,6 +1,8 @@
+<script lang="ts">let ultimaSelecao = ''</script>
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Activity, Dumbbell, RefreshCw } from 'lucide-vue-next'
+import { agruparExercicios } from '@/utils/seletorDesempenho'
 import { feedback } from '@/composables/useFeedback'
 import { db, type ExercicioCatalogo, type HistoricoTreino } from '@/database/db'
 import EvolucaoLinha from '@/components/evolucao/EvolucaoLinha.vue'
@@ -12,7 +14,10 @@ const sessoes = ref<HistoricoTreino[]>([])
 const catalogo = ref<ExercicioCatalogo[]>([])
 const carregando = ref(true)
 const erro = ref(false)
-const identidadeSelecionada = ref('')
+const identidadeSelecionada = ref(ultimaSelecao)
+watch(identidadeSelecionada, valor => { ultimaSelecao = valor })
+const busca = ref('')
+const grupos = computed(() => agruparExercicios(exercicios.value, busca.value))
 const historico = computed(() => agregarDesempenho(sessoes.value, catalogo.value))
 const exercicios = computed(() => {
   const mapa = new Map<string, { identidade: string; nome: string; grupoMuscular: string; sessoes: number; data: Date }>()
@@ -26,7 +31,7 @@ const exercicios = computed(() => {
 const execucoes = computed(() => historico.value.filter(item => item.identidade === identidadeSelecionada.value).sort((a, b) => a.data.getTime() - b.data.getTime()))
 const ultima = computed(() => execucoes.value.at(-1) ?? null)
 const recorde = computed(() => execucoes.value.reduce<number | null>((melhor, item) => item.maiorCargaKg === null ? melhor : Math.max(melhor ?? item.maiorCargaKg, item.maiorCargaKg), null))
-const pontosCarga = computed(() => execucoes.value.filter(item => item.maiorCargaKg !== null).map(item => ({ data: formatarDataCivil(`${item.data.getFullYear()}-${String(item.data.getMonth() + 1).padStart(2, '0')}-${String(item.data.getDate()).padStart(2, '0')}`), valor: item.maiorCargaKg! })))
+const pontosCarga = computed(() => execucoes.value.filter(item => item.maiorCargaKg !== null).map(item => ({ data: formatarDataCivil(`${item.data.getFullYear()}-${String(item.data.getMonth() + 1).padStart(2, '0')}-${String(item.data.getDate()).padStart(2, '0')}`), dataCivil: `${item.data.getFullYear()}-${String(item.data.getMonth() + 1).padStart(2, '0')}-${String(item.data.getDate()).padStart(2, '0')}`, valor: item.maiorCargaKg! })))
 const dataFormatada = (data: Date) => new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(data)
 const valor = (numero: number) => new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(numero)
 
@@ -57,11 +62,12 @@ onMounted(carregar)
     <template v-else-if="exercicios.length">
       <section class="rounded-3xl border border-whitesmoke-200 bg-white p-4 shadow-sm sm:p-5" aria-labelledby="selecionar-exercicio">
         <div class="mb-3 flex items-center gap-2 text-sage-700"><Dumbbell :size="19" /><h2 id="selecionar-exercicio" class="text-base font-black text-whitesmoke-950">Escolha um exercício</h2></div>
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <button v-for="exercicio in exercicios" :key="exercicio.identidade" type="button" class="min-h-16 rounded-2xl border p-3 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" :class="identidadeSelecionada === exercicio.identidade ? 'border-sage-500 bg-sage-50' : 'border-whitesmoke-200 bg-white hover:border-sage-200 hover:bg-sage-50/40'" :aria-pressed="identidadeSelecionada === exercicio.identidade" @click="identidadeSelecionada = exercicio.identidade">
-            <span class="block truncate text-sm font-bold text-whitesmoke-900">{{ exercicio.nome }}</span><span class="mt-1 block text-xs text-whitesmoke-500">{{ exercicio.grupoMuscular }} · {{ exercicio.sessoes }} {{ exercicio.sessoes === 1 ? 'sessão' : 'sessões' }}</span>
-          </button>
-        </div>
+        <input v-model="busca" type="search" placeholder="Buscar exercício…" aria-label="Buscar exercício no desempenho" class="mb-3 min-h-11 w-full rounded-xl border border-whitesmoke-200 px-3 text-sm" />
+        <p v-if="!grupos.length" class="p-4 text-center text-sm text-whitesmoke-500">Nenhum exercício encontrado.</p>
+        <details v-for="[grupo, itens] in grupos" :key="grupo" :open="!!busca || itens.some(e => e.identidade === identidadeSelecionada)" class="mb-2 rounded-2xl border border-whitesmoke-200">
+          <summary class="min-h-11 cursor-pointer p-3 text-sm font-bold text-sage-700">{{ grupo }} <span class="text-xs text-whitesmoke-500">({{ itens.length }})</span></summary>
+          <div class="grid gap-2 p-2 sm:grid-cols-2"><button v-for="e in itens" :key="e.identidade" type="button" :aria-pressed="identidadeSelecionada === e.identidade" class="min-h-14 rounded-xl border p-3 text-left text-sm" :class="identidadeSelecionada === e.identidade ? 'border-sage-500 bg-sage-50 font-bold' : 'border-whitesmoke-100'" @click="identidadeSelecionada = e.identidade">{{ e.nome }}<span class="block text-xs font-normal text-whitesmoke-500">{{ e.sessoes }} sessões</span></button></div>
+        </details>
       </section>
 
       <template v-if="ultima">

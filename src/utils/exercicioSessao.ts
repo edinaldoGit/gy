@@ -73,3 +73,10 @@ export function recuperarExercicio(ex: ExercicioRealizado, catalogo: ExercicioCa
     concluido: series.length > 0 && series.every(s => s.finalizada), seriesRealizadas: series
   }
 }
+
+export function serieExecucaoValida(serie: SerieExecucao) {
+  return !!String(serie.pesoFito).trim() && Number.isFinite(Number(serie.pesoFito)) && Number(serie.pesoFito) >= 0 && Number(serie.pesoFito) <= 10000 && !!String(serie.repsFeitas).trim() && Number.isInteger(Number(serie.repsFeitas)) && Number(serie.repsFeitas) > 0 && Number(serie.repsFeitas) <= 10000
+}
+export function sessaoProntaParaFinalizar(exercicios: ExercicioExecucao[]) {
+  return exercicios.length > 0 && exercicios.every(e => e.concluido && e.seriesRealizadas.length > 0 && e.seriesRealizadas.every(serieExecucaoValida))
+}

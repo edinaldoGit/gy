@@ -11,6 +11,7 @@ export interface Perfil {
 }
 
 export interface ExercicioCatalogo {
+  arquivado?: boolean;
   id?: number;
   exercicioCanonicoId?: string;
   nome: string;
@@ -114,6 +115,10 @@ export interface MedidaCorporal {
   cinturaCm?: number;
   quadrilCm?: number;
   peitoralCm?: number;
+  bracoDireitoRelaxadoCm?: number;
+  bracoDireitoFlexionadoCm?: number;
+  bracoEsquerdoRelaxadoCm?: number;
+  bracoEsquerdoFlexionadoCm?: number;
   bracoEsquerdoCm?: number;
   bracoDireitoCm?: number;
   coxaEsquerdaCm?: number;

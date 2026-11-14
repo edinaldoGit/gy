@@ -7,7 +7,7 @@ export function consultarSubstitutos(exercicio: ExercicioCatalogo, catalogo: Exe
   const identidade = exercicio.exercicioCanonicoId ?? identidadeOficial(exercicio)
   if (!identidade) return []
   return (curadoria.get(identidade) ?? []).flatMap(alternativa => {
-    const destino = catalogo.find(e => (e.exercicioCanonicoId ?? identidadeOficial(e)) === alternativa.exercicioCanonicoId)
+    const destino = catalogo.find(e => !e.arquivado && (e.exercicioCanonicoId ?? identidadeOficial(e)) === alternativa.exercicioCanonicoId)
     return destino && destino.id !== exercicio.id ? [{ ...alternativa, exercicio: destino }] : []
   }).sort((a, b) => a.prioridade - b.prioridade || a.exercicioCanonicoId.localeCompare(b.exercicioCanonicoId))
 }

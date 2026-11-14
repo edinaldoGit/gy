@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useTreinoStore } from '@/stores/treinoStore'
 import { Dumbbell, ClipboardList, History, User, ChevronDown, UserRound, ChartNoAxesCombined } from 'lucide-vue-next'
+import { useFinalizarTreino } from '@/composables/useFinalizarTreino'
 import { usePerfilAtual } from '@/composables/usePerfilAtual'
 import { sequencia } from '@/services/sequencia'
 
@@ -15,6 +16,7 @@ import { confirmation } from '@/composables/useConfirm'
 import { foguinhoModal } from '@/services/foguinhoModal'
 import FoguinhoChama from './FoguinhoChama.vue'
 
+const finalizarTreino = useFinalizarTreino()
 const route = useRoute()
 const isMenuExpanded = ref(false)
 const { perfil } = usePerfilAtual()
@@ -30,9 +32,9 @@ watch([feedbackVisible, () => !!confirmation.state.value.options], ([visible, mo
 
 // --- Integração Real com o Treino ---
 const treinoStore = useTreinoStore()
-const { estadoAtual, cronometroFormatado } = storeToRefs(treinoStore)
+const { cronometroFormatado } = storeToRefs(treinoStore)
 
-const isWorkoutActive = computed(() => estadoAtual.value === 'execucao')
+const isWorkoutActive = computed(() => treinoStore.sessaoEstado === 'em_andamento')
 const chama = computed(() => sequencia.estado.value.nivel)
 const treinosNoCiclo = computed(() => sequencia.estado.value.concluidosNoCiclo)
 const treinosNoCicloExibidos = computed(() => treinosNoCiclo.value > 99 ? '99+' : String(treinosNoCiclo.value))
@@ -119,17 +121,17 @@ const abrirFoguinho = (evento: MouseEvent) => {
           <Transition name="fade-scale" mode="out-in">
             
             <!-- Estado 1: Treino ROLANDO (Cronômetro Pulsante) -->
-            <div v-if="isWorkoutActive" class="flex flex-col items-center absolute inset-0 justify-center">
-              <div class="flex items-center gap-1.5 bg-whitesmoke-950/15 px-3 py-1.5 rounded-full backdrop-blur-sm border border-whitesmoke-50/20 shadow-inner">
+            <button v-if="isWorkoutActive" type="button" aria-label="Finalizar treino" :disabled="treinoStore.finalizando || treinoStore.cancelando" class="flex min-h-11 flex-col items-center absolute inset-0 justify-center rounded-xl focus-visible:outline-2 focus-visible:outline-white" @click="finalizarTreino">
+              <div class="flex items-center gap-1 sm:gap-1.5 bg-whitesmoke-950/15 px-2 sm:px-3 py-1.5 rounded-full backdrop-blur-sm border border-whitesmoke-50/20 shadow-inner">
                 <div class="w-2 h-2 rounded-full bg-bubblegum-400 animate-pulse shadow-[0_0_5px_rgba(252,100,113,0.8)]"></div>
                 <span class="text-[11px] font-bold text-whitesmoke-50 tracking-widest font-mono translate-y-[0.5px]">
                   {{ cronometroFormatado }}
                 </span>
               </div>
               <span class="text-[7px] font-bold text-whitesmoke-50/80 uppercase tracking-[0.2em] mt-1.5 drop-shadow-sm">
-                Em Andamento
+                Finalizar treino
               </span>
-            </div>
+            </button>
 
             <!-- Estado 2: Repouso / Finalizado (Logo Pintada de Branco) -->
             <div v-else class="flex flex-col items-center justify-center absolute inset-0">
@@ -149,11 +151,11 @@ const abrirFoguinho = (evento: MouseEvent) => {
           <Transition name="pill" appear mode="out-in">
             <div 
               :key="currentTab.path"
-              class="h-9 flex items-center pl-4 pr-8 -mr-6 rounded-l-full shadow-sm relative z-0 whitespace-nowrap overflow-hidden"
+              class="topbar-tab-pill h-9 flex items-center pl-4 pr-8 -mr-6 rounded-l-full shadow-sm relative z-0 whitespace-nowrap overflow-hidden"
               :class="[activeTabStyles.pillBg]"
             >
               <span 
-                class="text-[11px] font-bold uppercase tracking-widest"
+                class="topbar-tab-label text-[11px] font-bold uppercase tracking-widest"
                 :class="activeTabStyles.pillText"
               >
                 {{ currentTab.name }}
@@ -247,6 +249,14 @@ const abrirFoguinho = (evento: MouseEvent) => {
 .foguinho-badge-count { color: var(--foguinho-cor); font-family: 'Fredoka', sans-serif; font-size: 15px; font-weight: 600; line-height: 1; white-space: nowrap; pointer-events: none; }
 .foguinho-badge-count-wide { font-size: 13px; letter-spacing: -.3px; }
 @media (max-width: 359px) { .foguinho-profile-group { gap: 4px; } .foguinho-badge { width: 28px; } .foguinho-badge::before { left: -2px; right: -14px; } }
+@media (max-width: 639px) {
+  .topbar-normal { display: grid; grid-template-columns: minmax(0, 1fr) 64px minmax(0, 1fr); }
+  .topbar-normal > div:nth-child(2) { width: 64px; }
+  .topbar-normal > div:last-child { min-width: 0; }
+  .topbar-tab-pill { padding-left: 8px; padding-right: 24px; }
+  .topbar-tab-label { font-size: 9px; letter-spacing: 0; }
+}
+@media (max-width: 359px) { .topbar-tab-label { font-size: 8px; } .topbar-tab-pill { padding-left: 4px; } }
 .feedback-enter-active { transition: opacity .28s ease .18s, transform .36s cubic-bezier(.22,1,.36,1) .18s; }
 .feedback-leave-active { transition: opacity .18s ease, transform .2s ease; pointer-events: none; }
 .feedback-enter-from { opacity: 0; transform: translateY(16px) scale(.96); }

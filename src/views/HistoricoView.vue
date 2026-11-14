@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import CalendarioHistorico from '@/components/historico/CalendarioHistorico.vue'
+import { diaDaConclusao } from '@/utils/limiteDiario'
 import { feedback } from '@/composables/useFeedback'
 import { computed, onMounted, ref } from 'vue'
 import { db, type HistoricoTreino } from '@/database/db'
@@ -12,10 +14,12 @@ const erro = ref(false)
 const sessoes = ref<HistoricoTreino[]>([])
 const sessaoSelecionada = ref<HistoricoTreino | null>(null)
 const limiteVisivel = ref(20)
+const diaSelecionado = ref<string | null>(null)
 
 const resumo = computed(() => calcularResumoHistorico(sessoes.value))
 const sessoesOrdenadas = computed(() => ordenarHistorico(sessoes.value))
-const sessoesVisiveis = computed(() => sessoesOrdenadas.value.slice(0, limiteVisivel.value))
+const sessoesFiltradas = computed(() => sessoesOrdenadas.value.filter(s => !diaSelecionado.value || diaDaConclusao(s) === diaSelecionado.value))
+const sessoesVisiveis = computed(() => sessoesFiltradas.value.slice(0, limiteVisivel.value))
 
 const carregarHistorico = async () => {
   carregando.value = true
@@ -68,10 +72,12 @@ const horarioCard = (sessao: HistoricoTreino) => {
       </article>
     </section>
 
+    <CalendarioHistorico v-if="!carregando && !erro" :sessoes="sessoes" :selecionado="diaSelecionado" @selecionar="diaSelecionado = $event; limiteVisivel = 20" />
+
     <section aria-labelledby="lista-historico-titulo" class="flex flex-col gap-3">
       <div class="flex items-center justify-between px-1">
-        <h2 id="lista-historico-titulo" class="text-lg font-bold text-whitesmoke-900">Treinos recentes</h2>
-        <span v-if="!carregando && !erro && sessoesOrdenadas.length" class="text-xs font-medium text-whitesmoke-500">{{ sessoesOrdenadas.length }} {{ sessoesOrdenadas.length === 1 ? 'treino' : 'treinos' }}</span>
+        <h2 id="lista-historico-titulo" class="text-lg font-bold text-whitesmoke-900">{{ diaSelecionado ? 'Treinos deste dia' : 'Treinos recentes' }}</h2>
+        <span v-if="!carregando && !erro && sessoesOrdenadas.length" class="text-xs font-medium text-whitesmoke-500">{{ sessoesFiltradas.length }} {{ sessoesFiltradas.length === 1 ? 'treino' : 'treinos' }}</span>
       </div>
 
       <div v-if="carregando" class="flex flex-col items-center rounded-3xl border border-whitesmoke-200 bg-white px-5 py-12 text-center" role="status" aria-live="polite">
@@ -97,6 +103,7 @@ const horarioCard = (sessao: HistoricoTreino) => {
         </RouterLink>
       </div>
 
+      <p v-else-if="!sessoesFiltradas.length" class="rounded-2xl bg-white p-6 text-center text-sm text-whitesmoke-500">Nenhum treino concluído nesta data. Limpe o filtro para ver todos.</p>
       <template v-else>
         <button
           v-for="(sessao, index) in sessoesVisiveis"
@@ -128,7 +135,7 @@ const horarioCard = (sessao: HistoricoTreino) => {
           </div>
         </button>
 
-        <button v-if="limiteVisivel < sessoesOrdenadas.length" type="button" class="mx-auto inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-bold text-teal-700 transition hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-teal-600" @click="limiteVisivel += 20">
+        <button v-if="limiteVisivel < sessoesFiltradas.length" type="button" class="mx-auto inline-flex min-h-11 items-center gap-2 rounded-xl px-4 text-sm font-bold text-teal-700 transition hover:bg-teal-50 focus-visible:outline-2 focus-visible:outline-teal-600" @click="limiteVisivel += 20">
           Carregar mais <ChevronDown :size="17" />
         </button>
       </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RecortarFoto from './RecortarFoto.vue'
 import { ref } from 'vue'
 import type { Perfil } from '@/database/db'
 import { prepararFoto, salvarPerfil } from '@/services/perfil'
@@ -14,13 +15,14 @@ const pesoInicial = props.perfil.peso
 const salvando = ref(false)
 const processandoFoto = ref(false)
 const erro = ref('')
+const fotoParaRecortar = ref<string | null>(null)
 async function lerFoto(event: Event) {
   const input = event.target as HTMLInputElement
   const arquivo = input.files?.[0]
   input.value = ''
   if (!arquivo) return
   processandoFoto.value = true
-  try { dados.value.fotoPerfil = await prepararFoto(arquivo); erro.value = '' }
+  try { fotoParaRecortar.value = await prepararFoto(arquivo); erro.value = '' }
   catch (falha) { erro.value = falha instanceof Error ? falha.message : 'Não foi possível ler a foto.' }
   finally { processandoFoto.value = false }
 }
@@ -62,4 +64,5 @@ async function salvar() {
       </form>
     </section>
   </div>
+  <RecortarFoto v-if="fotoParaRecortar" :imagem="fotoParaRecortar" @confirmar="dados.fotoPerfil = $event; fotoParaRecortar = null" @cancelar="fotoParaRecortar = null" />
 </template>

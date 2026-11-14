@@ -5,7 +5,7 @@ import { exerciciosSeed } from '../data/catalogoOficial.ts'
 import { CHAVE_RASCUNHO_SESSAO } from '../utils/exercicioSessao.ts'
 
 export const FORMATO_BACKUP = 'gy-backup'
-export const VERSAO_BACKUP = 4
+export const VERSAO_BACKUP = 5
 export const TAMANHO_MAXIMO_BACKUP = 50 * 1024 * 1024
 
 export interface TabelasBackup {
@@ -21,7 +21,7 @@ export interface TabelasBackup {
 
 export interface DocumentoBackup {
   formato: typeof FORMATO_BACKUP
-  versao: 1 | 2 | 3 | 4
+  versao: 1 | 2 | 3 | 4 | 5
   criadoEm: string
   schemaOrigem: number
   tabelas: TabelasBackup
@@ -102,13 +102,13 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
   const r = objeto(valor)
   const permitidos: Record<keyof TabelasBackup, string[]> = {
     perfil: ['id', 'nome', 'idade', 'peso', 'altura', 'fotoPerfil', 'criadoEm'],
-    catalogo: ['exercicioCanonicoId', 'id', 'nome', 'grupoMuscular', 'equipamento', 'videoUrl', 'defaultSeries', 'defaultReps'],
+    catalogo: ['arquivado', 'exercicioCanonicoId', 'id', 'nome', 'grupoMuscular', 'equipamento', 'videoUrl', 'defaultSeries', 'defaultReps'],
     fichas: ['id', 'nome', 'foco', 'corTema', 'descricao', 'origem', 'criadoEm', 'atualizadoEm'],
     treinos: ['id', 'fichaId', 'nome', 'foco', 'ordem', 'diasDaSemana', 'exercicios', 'criadoEm', 'atualizadoEm', 'corTema'],
     configuracoes: ['chave', 'fichaAtivaId'],
     programacoes: ['id', 'fichaId', 'efetivaEm', 'diaLocalVigencia', 'fusoHorario', 'offsetMinutos', 'motivo', 'fichaNome', 'treinos', 'agenda'],
     historico: ['id', 'fichaId', 'treinoId', 'fichaNome', 'treinoNome', 'fichaFoco', 'fichaCorTema', 'dataInicio', 'dataFim', 'diaConclusaoLocal', 'fusoConclusao', 'offsetConclusaoMinutos', 'estado', 'duracaoMinutos', 'exerciciosRealizados'],
-    medidasCorporais: ['id', 'dataLocal', 'pesoKg', 'cinturaCm', 'quadrilCm', 'peitoralCm', 'bracoEsquerdoCm', 'bracoDireitoCm', 'coxaEsquerdaCm', 'coxaDireitaCm', 'panturrilhaEsquerdaCm', 'panturrilhaDireitaCm']
+    medidasCorporais: ['id', 'dataLocal', 'pesoKg', 'cinturaCm', 'quadrilCm', 'peitoralCm', 'bracoEsquerdoCm', 'bracoDireitoCm', 'bracoDireitoRelaxadoCm', 'bracoDireitoFlexionadoCm', 'bracoEsquerdoRelaxadoCm', 'bracoEsquerdoFlexionadoCm', 'coxaEsquerdaCm', 'coxaDireitaCm', 'panturrilhaEsquerdaCm', 'panturrilhaDireitaCm']
   }
   if (versao === 1 && chave === 'catalogo' && r.exercicioCanonicoId !== undefined) throw new ErroBackup(erros.dados)
   chaves(r, permitidos[chave])
@@ -127,6 +127,7 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
   if (chave === 'perfil') {
     if (!texto(r.nome, 200) || !numero(r.idade, 0, 130, true) || !numero(r.peso, 0, 1000) || !numero(r.altura, 0, 300) || !data(r.criadoEm) || r.fotoPerfil !== undefined && (!texto(r.fotoPerfil, TAMANHO_MAXIMO_BACKUP, true) || !imagemLocal(r.fotoPerfil))) throw new ErroBackup(erros.dados)
   } else if (chave === 'catalogo') {
+    if (r.arquivado !== undefined && (typeof r.arquivado !== 'boolean' || String(r.exercicioCanonicoId).startsWith('gy:oficial:'))) throw new ErroBackup(erros.dados)
     if (r.exercicioCanonicoId !== undefined && (!identidadeValida(r.exercicioCanonicoId) || r.exercicioCanonicoId.startsWith('gy:oficial:') && identidadeOficial(r as unknown as ExercicioCatalogo) !== r.exercicioCanonicoId)) throw new ErroBackup(erros.dados)
     if (!texto(r.nome, 300) || !texto(r.grupoMuscular, 100) || !texto(r.equipamento, 200, true) || !urlSegura(r.videoUrl) || !numero(r.defaultSeries, 1, 100, true) || !texto(r.defaultReps, 100)) throw new ErroBackup(erros.dados)
   } else if (chave === 'fichas') {
@@ -181,7 +182,7 @@ function validarRegistro(chave: keyof TabelasBackup, valor: unknown, versao: num
       }
     }
   } else {
-    const medidas = ['pesoKg', 'cinturaCm', 'quadrilCm', 'peitoralCm', 'bracoEsquerdoCm', 'bracoDireitoCm', 'coxaEsquerdaCm', 'coxaDireitaCm', 'panturrilhaEsquerdaCm', 'panturrilhaDireitaCm']
+    const medidas = ['pesoKg', 'cinturaCm', 'quadrilCm', 'peitoralCm', 'bracoEsquerdoCm', 'bracoDireitoCm', 'bracoDireitoRelaxadoCm', 'bracoDireitoFlexionadoCm', 'bracoEsquerdoRelaxadoCm', 'bracoEsquerdoFlexionadoCm', 'coxaEsquerdaCm', 'coxaDireitaCm', 'panturrilhaEsquerdaCm', 'panturrilhaDireitaCm']
     if (!datasCivil(r.dataLocal) || !medidas.some(campo => r[campo] !== undefined) || medidas.some(campo => r[campo] !== undefined && !numero(r[campo], campo === 'pesoKg' ? 0.1 : 1, campo === 'pesoKg' ? 1000 : 500))) throw new ErroBackup(erros.dados)
   }
   for (const campo of datasPorTabela[chave]) if (!data(r[campo], campo === 'dataFim')) throw new ErroBackup(erros.dados)
@@ -193,7 +194,7 @@ export function validarBackup(entrada: unknown): DocumentoBackup {
     chaves(doc, ['formato', 'versao', 'criadoEm', 'schemaOrigem', 'tabelas'])
     campos(doc, ['formato', 'versao', 'criadoEm', 'schemaOrigem', 'tabelas'])
     if (doc.formato !== FORMATO_BACKUP) throw new ErroBackup(erros.formato)
-    if (doc.versao !== 1 && doc.versao !== 2 && doc.versao !== 3 && doc.versao !== VERSAO_BACKUP) throw new ErroBackup(erros.versao)
+    if (doc.versao !== 1 && doc.versao !== 2 && doc.versao !== 3 && doc.versao !== 4 && doc.versao !== VERSAO_BACKUP) throw new ErroBackup(erros.versao)
     if (!data(doc.criadoEm) || !numero(doc.schemaOrigem, 1, 1000, true)) throw new ErroBackup(erros.dados)
     const tabelas = objeto(doc.tabelas)
     const nomesAntigos = ['perfil', 'catalogo', 'fichas', 'treinos', 'configuracoes', 'programacoes', 'historico'] as const

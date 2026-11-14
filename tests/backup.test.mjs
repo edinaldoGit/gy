@@ -47,7 +47,7 @@ test('exporta tabelas persistidas, datas, foto, fichas e sessão em andamento', 
   const dbFake = adaptador(fixture())
   const backup = await exportarBackup(dbFake, agora)
   assert.equal(backup.formato, FORMATO_BACKUP)
-  assert.equal(backup.versao, 4)
+  assert.equal(backup.versao, 5)
   assert.equal(backup.schemaOrigem, 6)
   assert.deepEqual(backup.tabelas.medidasCorporais, fixture().medidasCorporais)
   assert.equal(backup.tabelas.perfil[0].fotoPerfil, fixture().perfil[0].fotoPerfil)

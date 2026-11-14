@@ -18,13 +18,14 @@ const editandoId = ref<number | null>(null)
 const medidaGrafico = ref<CampoMedida>('cinturaCm')
 const periodo = ref<PeriodoCorporal>('90')
 const campos = camposMedida
+const camposFormulario = computed(() => campos.filter(c => !['bracoDireitoCm', 'bracoEsquerdoCm'].includes(c.chave) || form[c.chave] !== undefined))
 const form = reactive<Record<string, string>>({})
 const selecionado = computed(() => medidasNoPeriodo(registros.value, periodo.value))
 const ordenados = computed(() => ordenarMedidas(registros.value))
 const ultimaComPeso = computed(() => ordenados.value.find(item => item.pesoKg !== undefined))
 const mudancaPeso = computed(() => variacaoPeso(registros.value))
-const pontosPeso = computed(() => selecionado.value.filter(item => item.pesoKg !== undefined).map(item => ({ data: formatarDataCivil(item.dataLocal), valor: item.pesoKg! })))
-const pontosMedida = computed(() => selecionado.value.filter(item => item[medidaGrafico.value] !== undefined).map(item => ({ data: formatarDataCivil(item.dataLocal), valor: item[medidaGrafico.value]! })))
+const pontosPeso = computed(() => selecionado.value.filter(item => item.pesoKg !== undefined).map(item => ({ data: formatarDataCivil(item.dataLocal), dataCivil: item.dataLocal, valor: item.pesoKg! })))
+const pontosMedida = computed(() => selecionado.value.filter(item => item[medidaGrafico.value] !== undefined).map(item => ({ data: formatarDataCivil(item.dataLocal), dataCivil: item.dataLocal, valor: item[medidaGrafico.value]! })))
 const erroFormulario = ref('')
 const dataForm = () => form.dataLocal || dataLocalHoje()
 
@@ -148,7 +149,7 @@ onMounted(async () => { iniciarNovo(); await carregar() })
           <label class="col-span-2 flex flex-col gap-1 text-xs font-bold text-whitesmoke-700 sm:col-span-1">Data
             <input id="evolucao-data" v-model="form.dataLocal" type="date" :max="dataLocalHoje()" required class="min-h-11 min-w-0 rounded-xl border border-whitesmoke-200 bg-white px-3 text-sm text-whitesmoke-900 focus-visible:outline-2 focus-visible:outline-sage-600" />
           </label>
-          <label v-for="campo in campos" :key="campo.chave" class="flex min-w-0 flex-col gap-1 text-xs font-bold text-whitesmoke-700">{{ campo.nome }} ({{ campo.unidade }})
+          <label v-for="campo in camposFormulario" :key="campo.chave" class="flex min-w-0 flex-col gap-1 text-xs font-bold text-whitesmoke-700">{{ campo.nome }} ({{ campo.unidade }})
             <input v-model="form[campo.chave]" type="number" inputmode="decimal" min="0.1" :max="campo.maximo" step="0.1" :aria-label="`${campo.nome} em ${campo.unidade}, opcional`" placeholder="Opcional" class="min-h-11 min-w-0 w-full rounded-xl border border-whitesmoke-200 bg-white px-3 text-sm text-whitesmoke-900 placeholder:font-normal placeholder:text-whitesmoke-400 focus-visible:outline-2 focus-visible:outline-sage-600" />
           </label>
         </div>

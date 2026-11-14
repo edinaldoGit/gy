@@ -1,3 +1,4 @@
+import { serieExecucaoValida, sessaoProntaParaFinalizar } from '@/utils/exercicioSessao'
 import { feedback } from '@/composables/useFeedback'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
@@ -621,8 +622,7 @@ export const useTreinoStore = defineStore('treino', () => {
       treinoFinalizadoHoje.value = true
       return true
     }
-    if (sessaoEstado.value !== 'em_andamento' || exerciciosExecucao.value.some(ex => !ex.concluido)) return false
-    if (exerciciosExecucao.value.some(ex => !ex.seriesRealizadas.length || ex.seriesRealizadas.some(serie => !validarSerie(serie)))) return false
+    if (sessaoEstado.value !== 'em_andamento' || !sessaoProntaParaFinalizar(exerciciosExecucao.value)) return false
 
     if (!(await persistirSessaoAgora()) || sessaoId.value === null) return false
     atualizarCronometro()
@@ -688,7 +688,10 @@ export const useTreinoStore = defineStore('treino', () => {
       { id: 'emerald', bg: 'bg-emerald-500', text: 'text-emerald-500', light: 'bg-emerald-50' },
       { id: 'bubblegum', bg: 'bg-bubblegum-500', text: 'text-bubblegum-500', light: 'bg-bubblegum-50' },
       { id: 'orange', bg: 'bg-orange-500', text: 'text-orange-500', light: 'bg-orange-50' },
-      { id: 'rose', bg: 'bg-rose-500', text: 'text-rose-500', light: 'bg-rose-50' }
+      { id: 'rose', bg: 'bg-rose-500', text: 'text-rose-500', light: 'bg-rose-50' },
+      { id: 'indigo', bg: 'bg-indigo-500', text: 'text-indigo-500', light: 'bg-indigo-50' },
+      { id: 'amber', bg: 'bg-amber-600', text: 'text-amber-600', light: 'bg-amber-50' },
+      { id: 'slate', bg: 'bg-slate-600', text: 'text-slate-600', light: 'bg-slate-50' }
     ]
     return paletaCores.find(cor => cor.id === idCor) || paletaCores[1]
   }
@@ -710,7 +713,7 @@ export const useTreinoStore = defineStore('treino', () => {
     if (ex) ex.registrosEditados = true
   }
   const validarSerie = (serie: ExercicioExecucao['seriesRealizadas'][number]) => {
-    if (!String(serie.pesoFito).trim() || !Number.isFinite(Number(serie.pesoFito)) || Number(serie.pesoFito) < 0 || Number(serie.pesoFito) > 10000 || !String(serie.repsFeitas).trim() || !Number.isInteger(Number(serie.repsFeitas)) || Number(serie.repsFeitas) <= 0 || Number(serie.repsFeitas) > 10000) {
+    if (!serieExecucaoValida(serie)) {
       feedback.warning('Confira a série: informe uma carga válida a partir de zero e um número inteiro positivo de repetições.')
       return false
     }
@@ -722,7 +725,7 @@ export const useTreinoStore = defineStore('treino', () => {
     const anterior = exerciciosExecucao.value[index]
     if (!anterior) return false
     const destino = destinoId === undefined ? undefined : catalogo.value.find(e => e.id === destinoId)
-    if (destinoId !== undefined && !destino) { feedback.error('O exercício selecionado não está disponível.'); return false }
+    if (destinoId !== undefined && (!destino || destino.arquivado)) { feedback.error('O exercício selecionado não está disponível.'); return false }
     substituindo.value = true
     try {
       const proximo = trocarExercicio(anterior, destino)

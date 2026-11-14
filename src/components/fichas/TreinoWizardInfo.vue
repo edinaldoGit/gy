@@ -32,7 +32,7 @@ const valido = computed(() => !!treinoEditando.value.nome.trim() && !!treinoEdit
       <fieldset>
         <legend class="mb-3 text-xs font-bold text-whitesmoke-600">Cor do treino</legend>
         <div class="flex flex-wrap gap-3">
-          <button v-for="cor in store.paletaCores" :key="cor.id" type="button" :aria-label="`Usar cor ${cor.id}`" :aria-pressed="treinoEditando.corTema === cor.id" class="flex h-10 w-10 items-center justify-center rounded-full transition" :class="[cor.bg, treinoEditando.corTema === cor.id ? 'ring-4 ring-whitesmoke-200 ring-offset-2' : 'opacity-60']" @click="treinoEditando.corTema = cor.id"><Check v-if="treinoEditando.corTema === cor.id" :size="18" class="text-white" /></button>
+          <button v-for="cor in store.paletaCores" :key="cor.id" type="button" :disabled="store.corEstaEmUso(cor.id)" :title="store.corEstaEmUso(cor.id) ? 'Cor ocupada por outro treino' : cor.id" :aria-label="`${cor.id}${store.corEstaEmUso(cor.id) ? ': ocupada' : ''}`" :aria-pressed="treinoEditando.corTema === cor.id" class="flex h-10 w-10 items-center justify-center rounded-full transition disabled:opacity-20 disabled:cursor-not-allowed disabled:ring-2 disabled:ring-whitesmoke-400" :class="[cor.bg, treinoEditando.corTema === cor.id ? 'ring-4 ring-whitesmoke-200 ring-offset-2' : 'opacity-60']" @click="treinoEditando.corTema = cor.id"><Check v-if="treinoEditando.corTema === cor.id" :size="18" class="text-white" /></button>
         </div>
       </fieldset>
     </div>

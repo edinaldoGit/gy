@@ -3,6 +3,7 @@ import ModalSheetHeader from '@/components/layout/ModalSheetHeader.vue'
 import { modalSheetBackdrop, modalSheetPanel } from '@/components/layout/modalSheetStyles'
 import { ref, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useFinalizarTreino } from '@/composables/useFinalizarTreino'
 import { useTreinoStore } from '@/stores/treinoStore'
 import { CheckCircle2, ChevronDown, CheckCheck, RotateCcw, Check, Play, WifiOff, Timer, MoreHorizontal } from 'lucide-vue-next'
 import { ArrowLeftRight } from 'lucide-vue-next'
@@ -10,6 +11,7 @@ import { confirmation } from '@/composables/useConfirm'
 import SubstituirExercicio from './SubstituirExercicio.vue'
 import { temRegistros, type ExercicioExecucao } from '@/utils/exercicioSessao'
 
+const finalizarTreino = useFinalizarTreino()
 const store = useTreinoStore()
 const {
   treinoHoje, exerciciosExecucao, exercicioExpandido,
@@ -186,7 +188,7 @@ const confirmarCancelamento = () => {
     </div>
 
     <button
-      :aria-busy="store.finalizando" @click="store.finalizarTreino"
+      :aria-busy="store.finalizando" @click="finalizarTreino"
       :inert="!!slotSubstituicao || store.substituindo"
       :disabled="store.finalizando || progressoTreino.concluidos < progressoTreino.total"
       class="relative z-10 mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-amethyst-500 py-4 text-sm font-black text-white transition-all hover:bg-amethyst-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:active:scale-100 disabled:opacity-40"
