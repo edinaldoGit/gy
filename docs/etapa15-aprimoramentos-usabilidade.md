@@ -65,6 +65,7 @@ Os testes no navegador usam Chromium desktop com larguras móveis. Gestos em tel
 - `src/components/evolucao/EvolucaoLinha.vue`
 - `src/components/fichas/GerenciarExercicios.vue`
 - `src/components/fichas/TreinoWizardInfo.vue`
+- `src/components/fichas/FichaWizardCatalogo.vue`
 - `src/components/historico/CalendarioHistorico.vue`
 - `src/components/historico/EvolucaoDesempenho.vue`
 - `src/components/layout/TopBar.vue`

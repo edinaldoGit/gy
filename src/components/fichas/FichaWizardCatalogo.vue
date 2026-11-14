@@ -24,6 +24,8 @@ const classesSelecao = computed(() => {
     emerald: { border: 'border-emerald-500', bg: 'bg-emerald-50/30', text: 'bg-emerald-500 text-white', hex: '#2ec4b6' },
     orange: { border: 'border-orange-500', bg: 'bg-orange-50/30', text: 'bg-orange-500 text-white', hex: '#fb8500' },
     rose: { border: 'border-rose-500', bg: 'bg-rose-50/30', text: 'bg-rose-500 text-white', hex: '#ff5c8a' },
+    amber: { border: 'border-amber-600', bg: 'bg-amber-50/30', text: 'bg-amber-600 text-white', hex: '#d97706' },
+    slate: { border: 'border-slate-600', bg: 'bg-slate-50/30', text: 'bg-slate-600 text-white', hex: '#475569' },
     indigo: { border: 'border-indigo-500', bg: 'bg-indigo-50/30', text: 'bg-indigo-500 text-white', hex: '#6366f1' }
   }
   return map[id] || map['cerulean']
