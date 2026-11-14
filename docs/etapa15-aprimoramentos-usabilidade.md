@@ -48,4 +48,49 @@ Os testes no navegador usam Chromium desktop com larguras móveis. Gestos em tel
 
 ## Publicação
 
-Pendente de execução e confirmação do workflow para a versão 0.2.0. URL prevista: https://edinaldogit.github.io/gy/.
+- Commit de implementação: `e8956cd` — Implementa melhorias de usabilidade da etapa 15.
+- Push para `origin/main` concluído, sem push forçado.
+- Deploy aprovado: https://github.com/edinaldoGit/gy/actions/runs/43578177418.
+- Aplicativo publicado: https://edinaldogit.github.io/gy/.
+- Versão **0.2.0** confirmada no Perfil após a ativação normal da atualização do service worker.
+- Página principal, `manifest.webmanifest`, `sw.js`, JavaScript principal, módulo do banco, Pinia e CSS responderam HTTP 200. Manifest mantém `start_url: ./` e o escopo do Gy.
+- Recursos novos continuam incluídos no precache gerado pelo build PWA. Não foi executada uma sessão física offline em Android/iOS.
+
+### Relação completa de arquivos da implementação
+
+
+- `docs/etapa15-aprimoramentos-usabilidade.md`
+- `package-lock.json`
+- `package.json`
+- `src/components/evolucao/EvolucaoLinha.vue`
+- `src/components/fichas/GerenciarExercicios.vue`
+- `src/components/fichas/TreinoWizardInfo.vue`
+- `src/components/historico/CalendarioHistorico.vue`
+- `src/components/historico/EvolucaoDesempenho.vue`
+- `src/components/layout/TopBar.vue`
+- `src/components/perfil/EditarPerfil.vue`
+- `src/components/perfil/EvolucaoCorporal.vue`
+- `src/components/perfil/RecortarFoto.vue`
+- `src/components/treino/TreinoExecucao.vue`
+- `src/composables/useFinalizarTreino.ts`
+- `src/database/db.ts`
+- `src/services/backup.ts`
+- `src/services/exerciciosPersonalizados.ts`
+- `src/services/substituicoes.ts`
+- `src/stores/fichaStore.ts`
+- `src/stores/treinoStore.ts`
+- `src/utils/calendarioHistorico.ts`
+- `src/utils/catalogo.ts`
+- `src/utils/coresTreino.ts`
+- `src/utils/evolucao.ts`
+- `src/utils/exercicioSessao.ts`
+- `src/utils/graficos.ts`
+- `src/utils/recorteFoto.ts`
+- `src/utils/seletorDesempenho.ts`
+- `src/views/FichasView.vue`
+- `src/views/HistoricoView.vue`
+- `tests/backup.test.mjs`
+- `tests/etapa15-integracao.html`
+- `tests/etapa15-integracao.ts`
+- `tests/etapa15.test.mjs`
+- `tests/exerciciosInteligentes.test.mjs`
