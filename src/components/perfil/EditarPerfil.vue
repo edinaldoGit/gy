@@ -63,6 +63,6 @@ async function salvar() {
         <button :disabled="salvando || processandoFoto" class="min-h-12 rounded-2xl bg-bubblegum-500 px-4 font-bold text-white disabled:opacity-50">{{ processandoFoto ? 'Preparando foto…' : salvando ? 'Salvando…' : 'Salvar alterações' }}</button>
       </form>
     </section>
+    <Transition name="gy-modal" :duration="{ enter: 420, leave: 280 }"><RecortarFoto v-if="fotoParaRecortar" class="!z-[130]" :imagem="fotoParaRecortar" @confirmar="dados.fotoPerfil = $event; fotoParaRecortar = null" @cancelar="fotoParaRecortar = null" /></Transition>
   </div>
-  <RecortarFoto v-if="fotoParaRecortar" :imagem="fotoParaRecortar" @confirmar="dados.fotoPerfil = $event; fotoParaRecortar = null" @cancelar="fotoParaRecortar = null" />
 </template>
