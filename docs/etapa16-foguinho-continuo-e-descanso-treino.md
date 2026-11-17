@@ -39,6 +39,14 @@ Versão do aplicativo: **0.2.1**. Data: 17/11/2026.
 
 As verificações visuais e de interação foram executadas em Chromium desktop com viewports móveis (375 px e 390 px). Comportamento de toque em tela física e atualização da PWA instalada em aparelhos Android/iOS reais continuam sujeitos à conferência em dispositivos físicos.
 
+## Publicação
+
+- Commit de implementação: `ed02c23` — Implementa sequência contínua do foguinho e controle de descanso na etapa 16.
+- Push para `origin/main` concluído, sem push forçado.
+- Deploy aprovado: https://github.com/edinaldoGit/gy/actions/runs/44114591653.
+- Aplicativo publicado: https://edinaldogit.github.io/gy/.
+- Raiz (`/gy/`), `manifest.webmanifest`, `sw.js` e entradas de rota (`/gy/fichas/`, `/gy/historico/`, `/gy/evolucao/`, `/gy/perfil/`) responderam HTTP 200.
+
 ### Relação completa de arquivos da implementação
 
 - `docs/etapa16-foguinho-continuo-e-descanso-treino.md`
