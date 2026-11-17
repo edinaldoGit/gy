@@ -158,7 +158,18 @@ const confirmarCancelamento = () => {
                     </div>
                   </div>
                 </div>
-                <label class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-whitesmoke-50 px-3 py-2 text-xs font-semibold text-whitesmoke-500">Descanso entre séries · segundos<input v-model.number="ex.descansoSegundos" type="number" min="0" max="3600" :aria-label="`Descanso de ${ex.nome} em segundos`" class="min-h-10 w-20 rounded-xl bg-whitesmoke-100 px-3 text-center text-whitesmoke-800" /></label>
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border px-3 py-2 text-xs font-semibold transition-colors" :class="ex.temDescanso ? 'border-teal-100 bg-teal-50/50 text-teal-700' : 'border-whitesmoke-200 bg-whitesmoke-50 text-whitesmoke-500'">
+                  <div class="flex items-center gap-2">
+                    <Timer :size="14" :class="ex.temDescanso ? 'text-teal-600' : 'text-whitesmoke-400'" />
+                    <span>Descanso entre séries · segundos</span>
+                  </div>
+                  <div class="flex items-center gap-2.5">
+                    <button type="button" :aria-label="`Descanso de ${ex.nome}`" :aria-pressed="ex.temDescanso" @click="store.alternarDescansoExercicio(ex.idUnico)" class="w-8 h-4 rounded-full p-0.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500" :class="ex.temDescanso ? 'bg-teal-500' : 'bg-whitesmoke-300'">
+                      <span class="block w-3 h-3 bg-white rounded-full transition-transform" :class="ex.temDescanso ? 'translate-x-4' : 'translate-x-0'"></span>
+                    </button>
+                    <input v-model.number="ex.descansoSegundos" type="number" min="0" max="3600" :disabled="!ex.temDescanso" :aria-label="`Descanso de ${ex.nome} em segundos`" class="min-h-10 w-20 rounded-xl bg-whitesmoke-100 px-3 text-center text-whitesmoke-800 transition-opacity disabled:cursor-not-allowed disabled:opacity-50" />
+                  </div>
+                </div>
               </div>
 
               <details class="group rounded-xl border border-amethyst-100 bg-amethyst-50/40">

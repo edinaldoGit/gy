@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { calcularFoguinho } from '../src/utils/sequencia.ts'
 import { contextoConclusao, proximoDia } from '../src/utils/diasLocais.ts'
 
@@ -72,7 +73,7 @@ test('as quatro primeiras semanas elevam os níveis Brasa, Labareda, Fogaréu e 
   }
 })
 
-test('quatro semanas válidas desbloqueiam Gy Prime e a semana seguinte conserva o nível', () => {
+test('quatro semanas válidas desbloqueiam Gy Prime e a semana seguinte conserva o nível e a contagem contínua', () => {
   const treinos = [1, 2, 3, 4, 5].map((dia, index) => ({ treinoId: index + 1, dia }))
   const programacao = grade('2026-10-05', treinos)
   const registros = []
@@ -84,18 +85,48 @@ test('quatro semanas válidas desbloqueiam Gy Prime e a semana seguinte conserva
   const estado = calcularFoguinho([programacao], registros.map((registro, index) => ({ ...registro, id: index + 1 })), data('2026-11-02'))
   assert.equal(estado.nivel, 5)
   assert.equal(estado.semanasConsecutivas, 4)
+  assert.equal(estado.treinosConsecutivos, 20)
   assert.equal(estado.concluidosNoCiclo, 0)
   assert.equal(estado.obrigacoesNoCiclo, 5)
 })
 
-test('uma falta após o prazo local quebra a sequência, mas sessão cancelada ou extra não a completa', () => {
+test('virada de semana (domingo -> segunda) preserva e incrementa treinosConsecutivos sem zerar mesmo com dias de descanso', () => {
+  const programacao = grade('2026-11-02', [
+    { treinoId: 1, dia: 1 }, { treinoId: 2, dia: 3 }, { treinoId: 3, dia: 5 }
+  ])
+  const registrosSemana1 = [sessao('2026-11-02', 1, 1), sessao('2026-11-04', 2, 2), sessao('2026-11-06', 3, 3)]
+  const domingo = calcularFoguinho([programacao], registrosSemana1, data('2026-11-08'))
+  assert.equal(domingo.treinosConsecutivos, 3)
+  assert.equal(domingo.concluidosNoCiclo, 3)
+
+  const segundaPendente = calcularFoguinho([programacao], registrosSemana1, data('2026-11-09'))
+  assert.equal(segundaPendente.treinosConsecutivos, 3)
+  assert.equal(segundaPendente.concluidosNoCiclo, 0)
+  assert.equal(segundaPendente.obrigacoesNoCiclo, 3)
+  assert.equal(segundaPendente.semanasConsecutivas, 1)
+
+  const segundaConcluida = calcularFoguinho([programacao], [...registrosSemana1, sessao('2026-11-09', 1, 4)], data('2026-11-09'))
+  assert.equal(segundaConcluida.treinosConsecutivos, 4)
+  assert.equal(segundaConcluida.concluidosNoCiclo, 1)
+  assert.equal(segundaConcluida.obrigacoesNoCiclo, 3)
+
+  const tercaDescanso = calcularFoguinho([programacao], [...registrosSemana1, sessao('2026-11-09', 1, 4)], data('2026-11-10'))
+  assert.equal(tercaDescanso.treinosConsecutivos, 4)
+})
+
+test('uma falta após o prazo local quebra a sequência e zera treinosConsecutivos, mas sessão cancelada ou extra não a completa', () => {
   const treinos = [1, 2, 3, 4, 5].map((dia, index) => ({ treinoId: index + 1, dia }))
   const programacao = grade('2026-11-02', treinos)
-  const registros = [sessao('2026-11-04', 3, 3), sessao('2026-11-03', 2, 20, 'cancelado'), sessao('2026-11-03', 99, 21)]
-  const estado = calcularFoguinho([programacao], registros, data('2026-11-04'))
-  assert.equal(estado.nivel, 0)
-  assert.equal(estado.semanasConsecutivas, 0)
-  assert.deepEqual(estado.diasPerdidos, ['2026-11-02', '2026-11-03'])
+  const registros = [sessao('2026-11-02', 1, 1), sessao('2026-11-03', 2, 20, 'cancelado'), sessao('2026-11-03', 99, 21)]
+  const estadoAposFalta = calcularFoguinho([programacao], registros, data('2026-11-04'))
+  assert.equal(estadoAposFalta.treinosConsecutivos, 0)
+  assert.equal(estadoAposFalta.nivel, 0)
+  assert.equal(estadoAposFalta.semanasConsecutivas, 0)
+  assert.deepEqual(estadoAposFalta.diasPerdidos, ['2026-11-03'])
+
+  const estadoRetomado = calcularFoguinho([programacao], [...registros, sessao('2026-11-04', 3, 3)], data('2026-11-04'))
+  assert.equal(estadoRetomado.treinosConsecutivos, 1)
+  assert.equal(estadoRetomado.nivel, 0)
 })
 
 test('deslocamento move a obrigação, sem apagar a falta do dia original', () => {
@@ -131,4 +162,22 @@ test('o treino extra não pontua e conclusões locais sobrevivem à mudança de 
     assert.equal(estado.concluidosNoCiclo, 1)
     assert.equal(estado.obrigacoesNoCiclo, 1)
   } finally { if (anterior === undefined) delete process.env.TZ; else process.env.TZ = anterior }
+})
+
+test('TopBar e FoguinhoModal exibem contador contínuo (treinosConsecutivos) e preservam card semanal', () => {
+  const topBar = readFileSync(new URL('../src/components/layout/TopBar.vue', import.meta.url), 'utf8')
+  const modal = readFileSync(new URL('../src/components/layout/FoguinhoModal.vue', import.meta.url), 'utf8')
+
+  assert.match(topBar, /sequencia\.estado\.value\.treinosConsecutivos/)
+  assert.doesNotMatch(topBar, /sequencia\.estado\.value\.concluidosNoCiclo/)
+  assert.match(topBar, /treinosConsecutivos\.value > 99 \? '99\+' : String\(treinosConsecutivos\.value\)/)
+  assert.match(topBar, /treinosConsecutivos >= 10 \? 'foguinho-badge-count-wide' : ''/)
+  assert.match(topBar, /na sequência contínua/)
+
+  assert.match(modal, /progresso\.treinosConsecutivos/)
+  assert.match(modal, /progresso\.semanasConsecutivas/)
+  assert.match(modal, /Sua semana/)
+  assert.match(modal, /Segunda a domingo · datas locais/)
+  assert.match(modal, /progresso\.concluidosNoCiclo/)
+  assert.match(modal, /progresso\.obrigacoesNoCiclo/)
 })

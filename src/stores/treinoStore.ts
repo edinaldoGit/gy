@@ -15,6 +15,7 @@ import { CHAVE_RASCUNHO_SESSAO, type ExercicioExecucao, trocarExercicio, usarRef
 import { identidadeDoCatalogo } from '@/utils/identidadeExercicio'
 import { carregarUltimasExecucoes } from '@/services/historicoExercicio'
 import type { ExecucaoAnterior } from '@/utils/historicoExercicio'
+import { useFichaStore } from '@/stores/fichaStore'
 
 type EstadoSessao = NonNullable<HistoricoTreino['estado']>
 type TreinoDoDia = Treino & { corTema: string; fichaNome: string }
@@ -354,6 +355,7 @@ export const useTreinoStore = defineStore('treino', () => {
       exercicioId: ex.exercicioId, ordem: ex.ordem ?? index + 1,
       series: ex.seriesPlanejadas ?? ex.seriesRealizadas.length, repsAlvo: ex.repsAlvo || '',
       taxaAumentoKg: ex.taxaAumentoKg ?? 0, descansoSegundos: ex.descansoSegundos ?? 60,
+      temDescanso: ex.temDescanso,
       pesoBaseAtual: ex.pesoBasePlanejado ?? 0, substitutosIds: []
     }))
   })
@@ -588,6 +590,89 @@ export const useTreinoStore = defineStore('treino', () => {
     }
   }
 
+  const sincronizarDescansoNosTreinos = (treinoId: number, alvoExercicioId: number, temDescanso: boolean, atualizadoEm: Date) => {
+    const atualizarLista = (exercicios: Treino['exercicios']) => exercicios.map(item =>
+      item.exercicioId === alvoExercicioId
+        ? { ...item, substitutosIds: [...(item.substitutosIds || [])], temDescanso }
+        : { ...item, substitutosIds: [...(item.substitutosIds || [])] }
+    )
+    if (treinoHoje.value && (treinoHoje.value.id === treinoId || treinoHoje.value.id === undefined)) {
+      treinoHoje.value = {
+        ...treinoHoje.value,
+        atualizadoEm,
+        exercicios: treinoHoje.value.exercicios.map(item =>
+          item.exercicioId === alvoExercicioId
+            ? { ...item, substitutosIds: [...(item.substitutosIds || [])], temDescanso }
+            : item
+        )
+      }
+    }
+    if (treinoAmanha.value?.id === treinoId) {
+      treinoAmanha.value = { ...treinoAmanha.value, atualizadoEm, exercicios: atualizarLista(treinoAmanha.value.exercicios) }
+    }
+    fichasSalvas.value = fichasSalvas.value.map(t =>
+      t.id === treinoId ? { ...t, atualizadoEm, exercicios: atualizarLista(t.exercicios) } : t
+    )
+    try {
+      const fichaStore = useFichaStore()
+      fichaStore.fichasSalvas = fichaStore.fichasSalvas.map(ficha => ({
+        ...ficha,
+        treinos: ficha.treinos.map(t =>
+          t.id === treinoId ? { ...t, atualizadoEm, exercicios: atualizarLista(t.exercicios) } : t
+        )
+      }))
+      if (fichaStore.fichaSelecionada) {
+        fichaStore.fichaSelecionada = {
+          ...fichaStore.fichaSelecionada,
+          treinos: fichaStore.fichaSelecionada.treinos.map(t =>
+            t.id === treinoId ? { ...t, atualizadoEm, exercicios: atualizarLista(t.exercicios) } : t
+          )
+        }
+      }
+      if (fichaStore.treinoEditando.id === treinoId) {
+        fichaStore.treinoEditando.exercicios = atualizarLista(fichaStore.treinoEditando.exercicios)
+      }
+    } catch { /* Store de fichas pode não estar ativa em contextos isolados. */ }
+  }
+
+  const alternarDescansoExercicio = async (idUnico: string) => {
+    const ex = exerciciosExecucao.value.find(e => e.idUnico === idUnico)
+    if (!ex) return false
+
+    const novoValor = !ex.temDescanso
+    ex.temDescanso = novoValor
+    if (!novoValor && (descansoRodando.value || descansoZerado.value)) {
+      pularDescanso()
+    }
+    marcarEdicao(idUnico)
+    const sessaoSalva = await persistirSessaoAgora()
+
+    const treinoId = treinoHoje.value?.id
+    const alvoExercicioId = ex.planejado?.exercicioId ?? ex.exercicioId
+    const agora = new Date()
+
+    if (treinoId != null) {
+      sincronizarDescansoNosTreinos(treinoId, alvoExercicioId, novoValor, agora)
+      try {
+        await comGravacaoGy(() => db.transaction('rw', db.treinos, async () => {
+          const treinoSalvo = await db.treinos.get(treinoId)
+          if (!treinoSalvo || !Array.isArray(treinoSalvo.exercicios)) return
+          if (!treinoSalvo.exercicios.some(item => item.exercicioId === alvoExercicioId)) return
+          const exercicios = treinoSalvo.exercicios.map(item => ({
+            ...item,
+            substitutosIds: [...(item.substitutosIds || [])],
+            ...(item.exercicioId === alvoExercicioId ? { temDescanso: novoValor } : {})
+          }))
+          await db.treinos.update(treinoId, { exercicios, atualizadoEm: agora })
+        }))
+      } catch {
+        /* Preserva a sessão ativa caso a tabela de treinos não esteja disponível em ambiente isolado. */
+      }
+    }
+
+    return sessaoSalva
+  }
+
   const autoExpandirProximo = (atualIdUnico: string) => {
     const indexAtual = exerciciosExecucao.value.findIndex(ex => ex.idUnico === atualIdUnico)
     const proximo = exerciciosExecucao.value[indexAtual + 1]
@@ -759,7 +844,7 @@ export const useTreinoStore = defineStore('treino', () => {
     cronometroFormatado, progressoTreino, modalTrocaAberto, modalVideoAberto, videoUrlAtivo, videoTituloAtivo,
     descansoTempoRestante, descansoRodando, descansoZerado,
     atualizarLimiteDiario, carregarTreinoDoDia, iniciarTreino, cancelarTreino, finalizarTreino, efetuarTrocaTreino, getCorObj,
-    concluirSerie, concluirTodasSeries, resetarExercicio, atualizarPesoSequencial, abrirVideo, pularDescanso,
+    concluirSerie, concluirTodasSeries, resetarExercicio, alternarDescansoExercicio, atualizarPesoSequencial, abrirVideo, pularDescanso,
     tentarSalvarNovamente, persistirSessaoAgora, preservarRascunho, pausarParaBackup, retomarAposBackup
   }
 })

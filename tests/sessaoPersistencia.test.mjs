@@ -21,7 +21,16 @@ const fake = {
   async get(id) { const row = registros.find(item => item.id === id); return row ? copia(row) : undefined },
   async update(id, dados) { const row = registros.find(item => item.id === id); if (!row) return 0; Object.assign(row, copia(dados)); registro = row; return 1 }
 }
+let treinosSalvos = []
+const fakeTreinos = {
+  async toArray() { return treinosSalvos.map(copia) },
+  where() { return { equals(fichaId) { return { async toArray() { return treinosSalvos.filter(item => item.fichaId === fichaId).map(copia) }, async count() { return treinosSalvos.filter(item => item.fichaId === fichaId).length } } } } },
+  async get(id) { const row = treinosSalvos.find(item => item.id === id); return row ? copia(row) : undefined },
+  async put(dados) { const idx = treinosSalvos.findIndex(item => item.id === dados.id); if (idx >= 0) treinosSalvos[idx] = copia(dados); else treinosSalvos.push(copia(dados)); return dados.id },
+  async update(id, dados) { const row = treinosSalvos.find(item => item.id === id); if (!row) return 0; Object.assign(row, copia(dados)); return 1 }
+}
 Object.defineProperty(db, 'historico', { value: fake, configurable: true })
+Object.defineProperty(db, 'treinos', { value: fakeTreinos, configurable: true })
 db.transaction = async (...args) => args.at(-1)()
 const memoria = new Map()
 Object.defineProperty(globalThis, 'sessionStorage', { configurable: true, value: { getItem: key => memoria.get(key) ?? null, setItem: (key, value) => memoria.set(key, value), removeItem: key => memoria.delete(key) } })
@@ -29,6 +38,7 @@ async function iniciar(t, instante) {
   t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', ...(instante ? ['Date'] : [])], ...(instante ? { now: instante.getTime() } : {}) })
   registro = undefined
   registros = []
+  treinosSalvos = [treino()]
   memoria.clear()
   setActivePinia(createPinia())
   const store = useTreinoStore()
@@ -273,4 +283,75 @@ test('conclusão em outra aba encerra a execução local e bloqueia novo treino'
   assert.equal(store.treinoFinalizadoHoje,true)
   assert.equal(store.sessaoEstado,'finalizado')
   assert.equal(await store.persistirSessaoAgora(),false)
+})
+
+test('alternar temDescanso na execução interrompe cronômetro ativo, impede novo disparo ao concluir série e restaura sessão com o valor escolhido', async t => {
+  const store = await iniciar(t)
+  store.exerciciosExecucao[0].descansoSegundos = 60
+  await store.persistirSessaoAgora()
+
+  store.concluirSerie('ex_0', 0)
+  assert.equal(store.descansoRodando, true)
+
+  assert.equal(await store.alternarDescansoExercicio('ex_0'), true)
+  assert.equal(store.exerciciosExecucao[0].temDescanso, false)
+  assert.equal(store.exerciciosExecucao[0].registrosEditados, true)
+  assert.equal(store.descansoRodando, false)
+  assert.equal(registro.exerciciosRealizados[0].temDescanso, false)
+
+  store.concluirSerie('ex_0', 1)
+  assert.equal(store.exerciciosExecucao[0].seriesRealizadas[1].finalizada, true)
+  assert.equal(store.descansoRodando, false)
+
+  setActivePinia(createPinia())
+  const recuperado = useTreinoStore()
+  await recuperado.carregarTreinoDoDia()
+  await nextTick()
+  assert.equal(recuperado.exerciciosExecucao[0].temDescanso, false)
+  assert.equal(recuperado.treinoHoje.exercicios[0].temDescanso, false)
+
+  assert.equal(await recuperado.alternarDescansoExercicio('ex_0'), true)
+  assert.equal(recuperado.exerciciosExecucao[0].temDescanso, true)
+  assert.equal(registro.exerciciosRealizados[0].temDescanso, true)
+})
+
+test('propaga temDescanso para db.treinos (inclusive após substituição) e persiste entre treinos futuros até nova alteração manual', async t => {
+  const store = await iniciar(t, new Date(2026, 10, 2, 10, 0))
+  store.catalogo.push({ id: 2, nome: 'Crucifixo halter', grupoMuscular: 'Peito', equipamento: 'Halter', videoUrl: '', defaultSeries: 2, defaultReps: '8', exercicioCanonicoId: 'gy:personalizado:auditoria12b' })
+  treinosSalvos = [{
+    ...treino(),
+    exercicios: [{ exercicioId: 1, ordem: 1, series: 2, repsAlvo: '8', pesoBaseAtual: 10, taxaAumentoKg: 0, descansoSegundos: 60, temDescanso: true, substitutosIds: [] }]
+  }]
+  const fichaStore = useFichaStore()
+  fichaStore.fichasSalvas = [{ id: 1, nome: 'Ficha fictícia', foco: 'Peito', corTema: 'teal', origem: 'local', criadoEm: new Date(), atualizadoEm: new Date(), treinos: copia(treinosSalvos) }]
+
+  assert.equal(await store.substituirExercicio('ex_0', 2), true)
+  assert.equal(store.exerciciosExecucao[0].exercicioId, 2)
+  assert.equal(store.exerciciosExecucao[0].planejado.exercicioId, 1)
+
+  assert.equal(await store.alternarDescansoExercicio('ex_0'), true)
+  assert.equal(store.exerciciosExecucao[0].temDescanso, false)
+  assert.equal((await db.treinos.get(2)).exercicios[0].temDescanso, false)
+  assert.equal(fichaStore.fichasSalvas[0].treinos[0].exercicios[0].temDescanso, false)
+
+  store.concluirTodasSeries('ex_0')
+  assert.equal(await store.finalizarTreino(), true)
+
+  t.mock.timers.setTime(new Date(2026, 10, 3, 10, 0).getTime())
+  setActivePinia(createPinia())
+  const proximoDiaStore = useTreinoStore()
+  proximoDiaStore.catalogo = store.catalogo
+  const fichaAtualizada = await db.treinos.get(2)
+  assert.equal(await proximoDiaStore.iniciarTreino({ ...fichaAtualizada, corTema: 'teal', fichaNome: 'Ficha fictícia' }), true)
+  assert.equal(proximoDiaStore.exerciciosExecucao[0].temDescanso, false)
+
+  proximoDiaStore.concluirSerie('ex_0', 0)
+  assert.equal(proximoDiaStore.descansoRodando, false)
+
+  assert.equal(await proximoDiaStore.alternarDescansoExercicio('ex_0'), true)
+  assert.equal(proximoDiaStore.exerciciosExecucao[0].temDescanso, true)
+  assert.equal((await db.treinos.get(2)).exercicios[0].temDescanso, true)
+
+  proximoDiaStore.concluirSerie('ex_0', 1)
+  assert.equal(proximoDiaStore.descansoRodando, true)
 })

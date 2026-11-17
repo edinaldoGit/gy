@@ -61,16 +61,13 @@ export const calcularSequencia = (programacoes: Programacao[], sessoes: Sessao[]
     const dia = sessao.diaConclusaoLocal ?? diaLocal(fim)
     return dataCivil(dia) ? [dia] : []
   }))
-  // Uma mudança de fuso pode recuar a data de hoje, mas não torna registros anteriores futuros.
   const ultimoDia = [...vigencias.map(v => v.dia), ...conclusoes].reduce((ultimo, dia) => dia > ultimo ? dia : ultimo, hoje)
   let indice = 0
   let vigente: Programacao | undefined
-  // Identificadores civis validados YYYY-MM-DD têm a mesma ordem do calendário.
   for (let dia = vigencias[0]!.dia; dia <= ultimoDia; dia = proximoDia(dia)) {
     let obrigatorio = !!compromissoNoDia(vigente, dia)
     while (indice < vigencias.length && vigencias[indice]!.dia === dia) {
       vigente = vigencias[indice++]!.programacao
-      // Remover ou trocar a ficha não apaga um compromisso assumido no próprio dia.
       obrigatorio ||= !!compromissoNoDia(vigente, dia)
     }
     if (!obrigatorio) continue
@@ -136,6 +133,7 @@ export const calcularFoguinho = (programacoes: Programacao[], sessoes: Sessao[],
   }
 
   const inicial = vigencias[0]?.dia ?? hoje
+  const ultimoDia = [...vigencias.map(v => v.dia), ...concluidos.keys()].reduce((ultimo, dia) => dia > ultimo ? dia : ultimo, hoje)
   const segundaInicial = segundaDaSemana(inicial)
   const primeiraSemanaCompleta = inicial === segundaInicial ? segundaInicial : proximoDia(domingoDaSemana(segundaInicial))
   const segundaAtual = segundaDaSemana(hoje)
@@ -143,7 +141,7 @@ export const calcularFoguinho = (programacoes: Programacao[], sessoes: Sessao[],
   let indice = 0
   let vigente: Programacao | undefined
   if (vigencias.length) {
-    const fimCronograma = domingoDaSemana(segundaDaSemana(hoje))
+    const fimCronograma = domingoDaSemana(segundaDaSemana(ultimoDia))
     for (let dia = inicial; dia <= fimCronograma; dia = proximoDia(dia)) {
       let itensDoDia = compromissosDoDia(vigente, dia)
       while (indice < vigencias.length && vigencias[indice]!.dia === dia) {
@@ -159,20 +157,15 @@ export const calcularFoguinho = (programacoes: Programacao[], sessoes: Sessao[],
   const perdidos: string[] = []
   let semanasConsecutivas = 0
   let treinosConsecutivos = 0
-  for (let dia = inicial; dia < hoje; dia = proximoDia(dia)) {
+  for (let dia = inicial; dia <= ultimoDia; dia = proximoDia(dia)) {
     const obrigacoes = cronograma.get(dia) ?? []
     if (!obrigacoes.length) continue
     const feitos = concluidos.get(dia) ?? new Set<number>()
     if (obrigacoes.some(item => feitos.has(item.treinoId))) treinosConsecutivos++
-    else {
+    else if (dia < hoje) {
       perdidos.push(dia)
       treinosConsecutivos = 0
     }
-  }
-  const compromissosHoje = cronograma.get(hoje) ?? []
-  if (compromissosHoje.length) {
-    const feitos = concluidos.get(hoje) ?? new Set<number>()
-    treinosConsecutivos = compromissosHoje.some(item => feitos.has(item.treinoId)) ? treinosConsecutivos + 1 : treinosConsecutivos
   }
 
   for (let segunda = segundaDaSemana(inicial); segunda < segundaAtual; segunda = proximoDia(domingoDaSemana(segunda))) {

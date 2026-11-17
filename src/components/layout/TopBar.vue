@@ -36,12 +36,11 @@ const { cronometroFormatado } = storeToRefs(treinoStore)
 
 const isWorkoutActive = computed(() => treinoStore.sessaoEstado === 'em_andamento')
 const chama = computed(() => sequencia.estado.value.nivel)
-const treinosNoCiclo = computed(() => sequencia.estado.value.concluidosNoCiclo)
-const treinosNoCicloExibidos = computed(() => treinosNoCiclo.value > 99 ? '99+' : String(treinosNoCiclo.value))
-const obrigacoesNoCiclo = computed(() => sequencia.estado.value.obrigacoesNoCiclo)
+const treinosConsecutivos = computed(() => sequencia.estado.value.treinosConsecutivos)
+const treinosConsecutivosExibidos = computed(() => treinosConsecutivos.value > 99 ? '99+' : String(treinosConsecutivos.value))
 const badgeLabel = computed(() => sequencia.erro.value
   ? 'Progresso do foguinho indisponível. Toque para abrir os detalhes.'
-  : `${['Chama Polar', 'Faísca', 'Brasa Viva', 'Labareda', 'Fogaréu', 'Gy Prime'][chama.value]}. ${treinosNoCiclo.value} de ${obrigacoesNoCiclo.value} treinos concluídos no ciclo atual. Toque para ver o progresso.`)
+  : `${['Chama Polar', 'Faísca', 'Brasa Viva', 'Labareda', 'Fogaréu', 'Gy Prime'][chama.value]}. ${treinosConsecutivos.value} ${treinosConsecutivos.value === 1 ? 'treino consecutivo' : 'treinos consecutivos'} na sequência contínua. Toque para ver o progresso.`)
 // ------------------------------------
 
 const navItems = [
@@ -110,7 +109,7 @@ const abrirFoguinho = (evento: MouseEvent) => {
               <UserRound v-else :size="28" :class="activeTabStyles.icon" aria-hidden="true" />
             </button>
             <button type="button" :aria-label="badgeLabel" class="foguinho-badge relative flex h-14 w-8 shrink-0 flex-col items-center justify-center gap-0.5 rounded-full bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" :style="{ '--foguinho-cor': ['#54BDF2', '#F89337', '#E5A523', '#F35F52', '#D94C9D', '#BB7BFF'][chama] || '#54BDF2' }" @click.stop="abrirFoguinho">
-              <span class="foguinho-badge-count" :class="treinosNoCiclo >= 10 ? 'foguinho-badge-count-wide' : ''">{{ treinosNoCicloExibidos }}</span>
+              <span class="foguinho-badge-count" :class="treinosConsecutivos >= 10 ? 'foguinho-badge-count-wide' : ''">{{ treinosConsecutivosExibidos }}</span>
               <FoguinhoChama :nivel="chama" :tamanho="21" :animar="chama === 5" />
             </button>
           </div>

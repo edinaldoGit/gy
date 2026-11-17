@@ -181,6 +181,19 @@ test('sem limite artificial: 401 dias programados cumpridos preservam a contagem
   assert.equal(calcularSequencia([plano([0, 1, 2, 3, 4, 5, 6], '2025-01-01')], registros, data(dia)).quantidade, 401)
 })
 
+test('virada de semana (domingo -> segunda) com dias de descanso preserva e incrementa a sequência sem zerar', () => {
+  const concluidas = ['2026-11-02', '2026-11-04', '2026-11-06']
+  const domingo = calcular([1, 3, 5], concluidas, '2026-11-08')
+  assert.equal(domingo.quantidade, 3)
+  assert.deepEqual(domingo.diasPerdidos, [])
+  const segundaAntesDoTreino = calcular([1, 3, 5], concluidas, '2026-11-09')
+  assert.equal(segundaAntesDoTreino.quantidade, 3)
+  assert.deepEqual(segundaAntesDoTreino.diasPerdidos, [])
+  const segundaAposTreino = calcular([1, 3, 5], [...concluidas, '2026-11-09'], '2026-11-09')
+  assert.equal(segundaAposTreino.quantidade, 4)
+  assert.deepEqual(segundaAposTreino.diasPerdidos, [])
+})
+
 test('viagem recuando a data local preserva conclusões anteriores e não reabre a vigência passada', () => {
   const anterior = process.env.TZ
   try {

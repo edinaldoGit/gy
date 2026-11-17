@@ -13,12 +13,12 @@ const proximoNivel = computed(() => NIVEIS_FOGUINHO[progresso.value.nivel + 1])
 const progressoCiclo = computed(() => progresso.value.obrigacoesNoCiclo ? Math.round(progresso.value.concluidosNoCiclo / progresso.value.obrigacoesNoCiclo * 100) : 0)
 const semanasRestantes = computed(() => proximoNivel.value ? Math.max(0, progresso.value.nivel + 1 - progresso.value.semanasConsecutivas) : 0)
 const descricao = computed(() => progresso.value.nivel === 0
-  ? 'Seu fogo está começando a despertar.'
+  ? 'Seu fogo está começando a despertar. A contagem de treinos é contínua e só zera se houver falta em um dia programado.'
   : progresso.value.nivel === 1
-    ? 'Duas sessões seguidas acenderam sua primeira faísca.'
+    ? 'Duas sessões seguidas acenderam sua primeira faísca. A contagem continua entre semanas sem resetar.'
     : progresso.value.nivel === 5
-      ? 'Você alcançou o nível máximo do Gy.'
-      : 'Seu fogo está ficando cada vez mais forte!')
+      ? 'Você alcançou o nível máximo do Gy. Sua contagem segue contínua enquanto não houver faltas.'
+      : 'Seu fogo está ficando cada vez mais forte! A contagem não zera na virada da semana.')
 const mensagemProxima = computed(() => {
   if (!proximoNivel.value) return 'Mantenha todos os treinos programados para conservar o Gy Prime.'
   if (progresso.value.nivel === 0) return 'Conclua 2 treinos programados sem interrupção para acender a Faísca.'
@@ -50,8 +50,8 @@ onBeforeUnmount(() => document.removeEventListener('keydown', teclado))
             <div class="min-w-0 flex-1"><p class="text-xs font-semibold text-whitesmoke-500">Nível atual</p><h3 class="truncate text-xl font-black" :style="{ color: typeof nivelAtual.cor === 'string' && !nivelAtual.cor.startsWith('linear') ? nivelAtual.cor : '#8c4de8' }">{{ indisponivel ? 'Progresso indisponível' : nivelAtual.nome }}</h3><p id="foguinho-descricao" class="mt-1 text-xs leading-relaxed text-whitesmoke-600">{{ indisponivel ? 'Tente reabrir o aplicativo para carregar seus dados.' : descricao }}</p></div>
           </div>
           <div class="relative mt-4 grid grid-cols-2 gap-2">
-            <div class="rounded-xl border border-white/80 bg-white/80 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-whitesmoke-500">Sequência</p><p class="mt-1 text-lg font-black text-whitesmoke-900">{{ progresso.semanasConsecutivas }} <span class="text-xs font-semibold">{{ progresso.semanasConsecutivas === 1 ? 'semana' : 'semanas' }}</span></p></div>
-            <div class="rounded-xl border border-white/80 bg-white/80 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-whitesmoke-500">Ciclo atual</p><p class="mt-1 text-lg font-black text-whitesmoke-900">{{ progresso.concluidosNoCiclo }} <span class="text-sm font-semibold">de {{ progresso.obrigacoesNoCiclo }}</span></p></div>
+            <div class="rounded-xl border border-white/80 bg-white/80 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-whitesmoke-500">Sequência contínua</p><p class="mt-1 text-lg font-black text-whitesmoke-900">{{ progresso.treinosConsecutivos }} <span class="text-xs font-semibold">{{ progresso.treinosConsecutivos === 1 ? 'treino' : 'treinos' }}</span></p><p class="mt-0.5 text-[10px] text-whitesmoke-500">Não zera na virada da semana</p></div>
+            <div class="rounded-xl border border-white/80 bg-white/80 p-3"><p class="text-[10px] font-semibold uppercase tracking-wide text-whitesmoke-500">Semanas completas</p><p class="mt-1 text-lg font-black text-whitesmoke-900">{{ progresso.semanasConsecutivas }} <span class="text-xs font-semibold">{{ progresso.semanasConsecutivas === 1 ? 'semana' : 'semanas' }}</span></p><p class="mt-0.5 text-[10px] text-whitesmoke-500">Evoluem o nível da chama</p></div>
           </div>
         </section>
 
@@ -82,7 +82,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', teclado))
           </div>
         </section>
 
-        <details class="mt-4 rounded-[1.4rem] border border-whitesmoke-200 bg-white p-4"><summary class="cursor-pointer text-sm font-black text-whitesmoke-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bubblegum-600">Como funciona?</summary><ul class="mt-3 space-y-2 text-xs leading-relaxed text-whitesmoke-600"><li>Seu foguinho cresce quando você conclui todos os treinos programados da semana.</li><li>Dias de descanso não quebram a sequência. Uma falta em dia obrigatório reinicia a progressão.</li><li>Cada semana completa válida fortalece a chama; quatro semanas consecutivas desbloqueiam o Gy Prime.</li><li>Deslocar treinos não apaga faltas já consolidadas.</li></ul></details>
+        <details class="mt-4 rounded-[1.4rem] border border-whitesmoke-200 bg-white p-4"><summary class="cursor-pointer text-sm font-black text-whitesmoke-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bubblegum-600">Como funciona?</summary><ul class="mt-3 space-y-2 text-xs leading-relaxed text-whitesmoke-600"><li>A contagem do foguinho soma seus treinos consecutivos de forma contínua e não reseta ao iniciar uma nova semana.</li><li>Dias de descanso não quebram a sequência. A contagem e a progressão só zeram se houver falta em um dia programado.</li><li>Os níveis da chama evoluem por semanas completas consecutivas sem falta; quatro semanas seguidas desbloqueiam o Gy Prime.</li><li>Deslocar treinos não apaga faltas já consolidadas.</li></ul></details>
       </section>
     </div>
   </Transition>

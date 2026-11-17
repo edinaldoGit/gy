@@ -46,8 +46,8 @@ document.querySelector<HTMLButtonElement>('#executar')!.addEventListener('click'
     const programacoes = await db.programacoes.toArray()
     const sessoes = await db.historico.toArray()
     const estado = calcularFoguinho(programacoes, sessoes, new Date())
-    if (estado.nivel !== 5 || estado.semanasConsecutivas !== 4 || estado.concluidosNoCiclo !== 1 || estado.obrigacoesNoCiclo !== 5) throw new Error(`Resultado inesperado: nível ${estado.nivel}, ${estado.semanasConsecutivas} semanas, ciclo ${estado.concluidosNoCiclo}/${estado.obrigacoesNoCiclo}.`)
-    resultado.textContent = 'Jornada fictícia gravada no IndexedDB real. Gy Prime validado após 4 semanas completas; ciclo atual em 1/5, sem perder o nível. Abra Gy pelo link para conferir o badge e o modal. Dados limitados à origem isolada 127.0.0.1:5197.'
+    if (estado.nivel !== 5 || estado.semanasConsecutivas !== 4 || estado.treinosConsecutivos !== 21 || estado.concluidosNoCiclo !== 1 || estado.obrigacoesNoCiclo !== 5) throw new Error(`Resultado inesperado: nível ${estado.nivel}, ${estado.semanasConsecutivas} semanas, ${estado.treinosConsecutivos} treinos consecutivos, ciclo ${estado.concluidosNoCiclo}/${estado.obrigacoesNoCiclo}.`)
+    resultado.textContent = 'Jornada fictícia gravada no IndexedDB real. Gy Prime validado após 4 semanas completas; sequência contínua em 21 treinos e ciclo atual em 1/5, sem perder o nível. Abra Gy pelo link para conferir o badge e o modal. Dados limitados à origem isolada 127.0.0.1:5197.'
   } catch (erro) {
     resultado.textContent = erro instanceof Error ? erro.message : 'Falha inesperada no teste.'
   }
